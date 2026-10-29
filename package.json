@@ -6,19 +6,25 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "next lint"
   },
   "dependencies": {
-    "next": "16.4.3",
-    "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "next": "14.2.18",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "wagmi": "2.12.17",
+    "viem": "2.21.19",
+    "@rainbow-me/rainbowkit": "2.2.3",
+    "@tanstack/react-query": "5.60.0"
   },
   "devDependencies": {
-    "@tailwindcss/turbopack": "^4",
-    "babel-plugin-react-compiler": "1.0.0",
-    "eslint": "^9",
-    "eslint-config-next": "16.4.3",
-    "tailwindcss": "^4"
-  },
-  "packageManager": "pnpm@11.20.0"
+    "typescript": "5.7.2",
+    "@types/node": "20.17.10",
+    "@types/react": "18.3.12",
+    "tailwindcss": "3.4.17",
+    "postcss": "8.4.49",
+    "autoprefixer": "10.4.20",
+    "eslint": "9.18.0",
+    "eslint-config-next": "14.2.18"
+  }
 }

@@ -1,26 +1,46 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  --color-surface: #031616;
+  --color-surface-dim: #031616;
+  --color-surface-bright: #293d3b;
+  --color-surface-container-highest: #253837;
+  --color-on-surface: #d1e7e5;
+  --color-tertiary-container: #ff7964;
+  --color-surface-tint: #5cdbbe;
+  --color-surface-container-low: #0b1f1e;
+  --color-surface-container: #0f2322;
+  --color-on-background: #d1e7e5;
+  --color-inverse-surface: #d1e7e5;
+  --color-primary: #5cdbbe;
+  --color-on-surface-variant: #bccac4;
+  --color-outline-variant: #3d4945;
+  --color-background: #031616;
+  --color-error: #ffb4ab;
+  --color-inverse-primary: #006b59;
+  --color-primary-container: #2bb59a;
+  --color-on-primary-container: #004035;
+  --color-tertiary: #ffb4a7;
+  --color-on-primary: #00382d;
+  --color-secondary: #f3be58;
+  --color-secondary-container: #956b00;
+  --color-on-secondary: #412d00;
+  --color-surface-variant: #253837;
+  --color-primary-fixed: #7bf8da;
+  --color-secondary-fixed: #ffdea6;
+  --color-surface-container-high: #1a2d2c;
+  --color-outline: #86948f;
+  --color-surface-container-lowest: #001110;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  body {
+    background: var(--color-surface-container-low);
+    color: var(--color-on-surface);
+    font-family: Inter, sans-serif;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-}
+/* Utility shorthands matching DESIGN.md */
+.sora { font-family: Sora, sans-serif; }
+.mono { font-family: 'JetBrains Mono', monospace; }
