@@ -8,6 +8,7 @@ import {
   useScroll,
 } from "framer-motion";
 import { useEffect, useState, useRef } from "react";
+import { useAccount } from "wagmi";
 
 function CountUp({ to, active, decimals = 0 }) {
   const mv = useMotionValue(0);
@@ -63,6 +64,9 @@ export default function Hero() {
     });
   };
   const onLeave = () => setTilt({ x: 0, y: 0 });
+
+  const { isConnected } = useAccount();
+
 
   return (
     <section
@@ -295,10 +299,10 @@ export default function Hero() {
         >
           <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
             <Link
-              href="/dashboard"
+              href={isConnected ? "/dashboard" : "/auth"}
               className="group w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-[#1aa56c] hover:bg-[#62dd9e] text-white hover:text-[#002111] sora text-[15px] font-semibold rounded-xl shadow-[0_8px_24px_rgba(26,165,108,.28)] transition-colors"
             >
-              Start saving
+              {isConnected ? "Go to dashboard" : "Start saving"}
               <motion.span
                 className="material-symbols-outlined text-[18px]"
                 animate={{ x: [0, 3, 0] }}

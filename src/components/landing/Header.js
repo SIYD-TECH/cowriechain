@@ -54,7 +54,7 @@ export default function Header() {
             Docs
           </a>
           <Link
-            href="/dashboard"
+            href="/auth"
             className="hidden sm:inline-flex px-5 py-2.5 bg-[#1aa56c] hover:bg-[#62dd9e] text-white hover:text-[#002111] rounded-xl text-[11px] font-semibold tracking-widest uppercase transition-colors shadow-[0_4px_16px_rgba(26,165,108,.22)] active:scale-[0.98]"
           >
             Connect wallet
@@ -91,7 +91,8 @@ export default function Header() {
               </a>
             ))}
             <Link
-              href="/dashboard"
+              href="/auth"
+              onClick={() => setOpen(false)}
               className="mt-2 w-full text-center px-5 py-3 bg-[#1aa56c] text-white rounded-xl text-[13px] font-semibold"
             >
               Connect wallet
