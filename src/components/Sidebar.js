@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 
 const NAV = [
-  { href: "/", label: "Dashboard", icon: "dashboard" },
+  { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
   { href: "/goals", label: "Goals", icon: "savings" },
   { href: "/circles", label: "Circles", icon: "groups" },
   { href: "/rewards", label: "Rewards", icon: "toll" },
