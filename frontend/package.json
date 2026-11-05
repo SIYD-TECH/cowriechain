@@ -1,0 +1,31 @@
+{
+  "name": "cowriechain",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@rainbow-me/rainbowkit": "2.2.3",
+    "@tanstack/react-query": "5.89.0",
+    "framer-motion": "^14.7.1",
+    "next": "14.2.33",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "viem": "2.21.19",
+    "wagmi": "2.12.17"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "20.17.10",
+    "@types/react": "18.3.12",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "14.2.18",
+    "postcss": "8.4.49",
+    "tailwindcss": "4.3.3",
+    "typescript": "5.7.2"
+  }
+}
