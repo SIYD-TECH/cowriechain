@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: cowriechain-backend
+    env: node
+    rootDir: backend
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: CHAIN_ID
+        value: 11155111
+      - key: SEPOLIA_RPC_URL
+        value: https://rpc.sepolia.org
+      - key: MOCK_USDC_ADDRESS
+        value: 0x5368a612Ec647dd85d63351dca7CB6C36100103B
+      - key: SAVINGS_VAULT_ADDRESS
+        value: 0xFa2982961244C4652a30A3144D11D09400234987
+      - key: GROUP_SAVE_FACTORY_ADDRESS
+        value: 0x2d1bBE433d2571559c1f13e918d05Dbe11b3A275
+      - key: CORS_ORIGIN
+        value: https://cowriechain.vercel.app,https://*.vercel.app
+

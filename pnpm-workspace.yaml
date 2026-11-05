@@ -1,3 +1,7 @@
+packages:
+  - 'frontend'
+  - 'backend'
+
 allowBuilds:
   bufferutil: false
   keccak: false

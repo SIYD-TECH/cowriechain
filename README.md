@@ -1,7 +1,7 @@
-# 🐚 CowrieChain
+# 🐚 CowrieChain Monorepo
 
-> **Sovereign Non-Custodial Savings & Rotational Credit on EVM**  
-> Bringing traditional African community savings (*Ajo*, *Esusu*, *Chama*, *Susu*) and personal commitment vaults on-chain — with zero custodians, automated escrow, and cryptographic discipline.
+> **Sovereign Non-Custodial Savings & Rotational Credit on Ethereum Sepolia**  
+> Bringing traditional African community savings (*Ajo*, *Esusu*, *Chama*, *Susu*, *Tontine*) and personal commitment vaults on-chain — with zero custodians, automated escrow, and cryptographic discipline.
 
 ---
 
@@ -10,264 +10,254 @@
 [![Wagmi](https://img.shields.io/badge/Wagmi-2.12-blue?logo=ethereum)](https://wagmi.sh/)
 [![RainbowKit](https://img.shields.io/badge/RainbowKit-2.2-7B3FE4)](https://www.rainbowkit.com/)
 [![TailwindCSS](https://img.shields.io/badge/TailwindCSS-v4-38B2AC?logo=tailwind-css)](https://tailwindcss.com/)
+[![Solidity](https://img.shields.io/badge/Solidity-^0.8.20-363636?logo=solidity)](https://soliditylang.org/)
+[![Foundry](https://img.shields.io/badge/Foundry-Tested-red?logo=ethereum)](https://getfoundry.sh/)
 [![Network](https://img.shields.io/badge/Network-Ethereum_Sepolia-627EEA?logo=ethereum)](https://sepolia.etherscan.io/)
 
 ---
 
-## 📖 Table of Contents
+## 📜 Deployed Sepolia Smart Contracts
 
-- [Overview](#-overview)
-- [Core Smart Contract Architecture](#-core-smart-contract-architecture)
-  - [1. GroupSave Contract (Rotational Savings / ROSCA)](#1-groupsave-contract-rotational-savings--rosca)
-  - [2. SavingsGoal Contract (Commitment Vaults)](#2-savingsgoal-contract-commitment-vaults)
-  - [3. Reward Pool & Consistency Engine](#3-reward-pool--consistency-engine)
-  - [4. MockUSDC Contract (ERC-20 Test Asset)](#4-mockusdc-contract-erc-20-test-asset)
-- [Smart Contract Interface Reference](#-smart-contract-interface-reference)
-- [Application Architecture & Tech Stack](#-application-architecture--tech-stack)
-- [Project Directory Structure](#-project-directory-structure)
-- [Getting Started](#-getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Installation](#installation)
-  - [Environment Variables](#environment-variables)
-  - [Running Locally](#running-locally)
-- [Smart Contract Deployment & Integration](#-smart-contract-deployment--integration)
-- [Security & Risk Disclosure](#-security--risk-disclosure)
-- [Contributing & License](#-contributing--license)
+The CowrieChain smart contracts are deployed and verified on Ethereum Sepolia (`Chain ID: 11155111`):
+
+| Contract | Address | Verification | Explorer Link |
+| :--- | :--- | :--- | :--- |
+| **`MockUSDC`** | [`0x5368a612Ec647dd85d63351dca7CB6C36100103B`](https://sepolia.etherscan.io/address/0x5368a612Ec647dd85d63351dca7CB6C36100103B#code) | **Verified** | [Etherscan](https://sepolia.etherscan.io/address/0x5368a612Ec647dd85d63351dca7CB6C36100103B#code) |
+| **`SavingsVault`** | [`0xFa2982961244C4652a30A3144D11D09400234987`](https://sepolia.etherscan.io/address/0xFa2982961244C4652a30A3144D11D09400234987#code) | **Verified** | [Etherscan](https://sepolia.etherscan.io/address/0xFa2982961244C4652a30A3144D11D09400234987#code) |
+| **`GroupSaveFactory`** | [`0x2d1bBE433d2571559c1f13e918d05Dbe11b3A275`](https://sepolia.etherscan.io/address/0x2d1bBE433d2571559c1f13e918d05Dbe11b3A275#code) | **Verified** | [Etherscan](https://sepolia.etherscan.io/address/0x2d1bBE433d2571559c1f13e918d05Dbe11b3A275#code) |
+| **Sample Circle** | [`0x318ddca988eA36bC27A82e4CB9057a22D608e1f6`](https://sepolia.etherscan.io/address/0x318ddca988eA36bC27A82e4CB9057a22D608e1f6#code) | **Verified** | [Etherscan](https://sepolia.etherscan.io/address/0x318ddca988eA36bC27A82e4CB9057a22D608e1f6#code) |
+
+- **Protocol Deployer & Treasury**: `0x97184EBAEB9FDCe449d5FbaF1311601005F8E811`
+- **Deployment Manifest**: Recorded in [`contract/deployments/sepolia.json`](contract/deployments/sepolia.json)
 
 ---
 
-## 🌟 Overview
+## 🏗 Repository Structure
 
-Across Africa and Latin America, centuries-old community lending and savings circles—known variably as **Ajo**, **Esusu**, **Chama**, **Tontines**, or **ROSCAs** (Rotating Savings and Credit Associations)—have formed the financial backbone of local economies. However, traditional circles suffer from key structural vulnerabilities:
-- Trusted collectors or treasurers can mismanage or abscond with pooled funds.
-- Members can default after collecting their round payout.
-- Individual savings are frequently eroded by inflation or impulsive spending.
-
-**CowrieChain** migrates these practices entirely on-chain through deterministic, tamper-proof EVM smart contracts:
-- **No Custodians**: Funds are strictly held by auditable smart contract vaults.
-- **Collateral-Backed Rotations**: Members stake collateral up-front; if a participant misses their periodic contribution, their collateral is slashed to keep the circle whole.
-- **Impulse-Resistant Vaults**: Personal goal vaults enforce strict timelocks or target balances with an automatic early-exit penalty that recycles into community rewards.
-- **Zero-KYC Web3 Sign-in**: Users authenticate entirely via self-custodial EVM wallets (MetaMask, Rabby, Rainbow, Coinbase Wallet, WalletConnect).
-
----
-
-## ⚙️ Core Smart Contract Architecture
-
-```
-                          ┌──────────────────────────┐
-                          │   CowrieChain Protocol   │
-                          └─────────────┬────────────┘
-                                        │
-             ┌──────────────────────────┼─────────────────────────┐
-             │                          │                         │
-             ▼                          ▼                         ▼
-   ┌───────────────────┐      ┌───────────────────┐     ┌───────────────────┐
-   │     GroupSave     │      │    SavingsGoal    │     │    Reward Pool    │
-   │  (Rotational/Ajo) │      │(Commitment Vaults)│     │(Recycled & Yield) │
-   └─────────┬─────────┘      └─────────┬─────────┘     └─────────┬─────────┘
-             │                          │                         │
-             │ Collateral Stakes        │ 5% Early-Exit Fee       │ Bonus Payouts
-             ▼                          └────────────────────────►│
-      [ Circle Payouts ]                                    [ Diligent Savers ]
-```
-
-### 1. GroupSave Contract (Rotational Savings / ROSCA)
-An automated escrow system executing fixed-cadence round distributions:
-- **Membership & Locking**: A predefined number of participants (`maxMembers`) join a circle. Once quorum is reached, the circle is locked (`lock()`).
-- **Collateral Staking**: Each participant deposits collateral (`depositCollateral()`) prior to round initiation to prevent default risk.
-- **Cyclic Contributions**: During each cycle, each active member deposits a fixed contribution (`contribute()`).
-- **Round Finalization & Claiming**: Once all members have contributed or the cycle deadline triggers, the round is finalized (`finalizeRound()`). The scheduled recipient for that cycle claims the entire pot (`claim()`).
-- **Collateral Release**: Upon successful completion of all rounds across all cycles, member collateral is released in full (`releaseCollateral()`).
-- **Circuit Breaker**: Protocol-level emergency pause (`togglePause()`) prevents state transitions in abnormal market or network conditions.
-
-### 2. SavingsGoal Contract (Commitment Vaults)
-A personal locked savings vault designed to cultivate financial discipline:
-- **Configuration**: User establishes `targetAmount`, maturity `deadline`, and descriptive metadata (`goalName`).
-- **Incremental Deposits**: Direct top-ups via `contribute(amount)` using stable assets (e.g., Mock USDC).
-- **Maturity Withdrawal**: When the target amount is hit or the timestamp matures beyond `deadline`, the saver executes `withdraw()` with **0% protocol fees**.
-- **Early-Exit Mechanism**: If the saver needs liquidity before maturity, they can trigger `withdrawEarly()`. A strict penalty (e.g., 5%) is charged and routed directly into the protocol's community reward pool.
-
-### 3. Reward Pool & Consistency Engine
-- Pre-funded incentives and recycled penalty fees reward consistent saving habits.
-- Users accumulate consistency points for paying circle cycles on time and completing vaults without early cancellations.
-- Rewards are distributed to disciplined users periodically (quarterly).
-
-### 4. MockUSDC Contract (ERC-20 Test Asset)
-- 6-decimal standard ERC-20 token simulating stablecoin functionality for test environments.
-- Features a public testnet `mint(to, amount)` function for seamless sandbox testing on Sepolia without real financial risk.
-
----
-
-## 📑 Smart Contract Interface Reference
-
-The frontend interacts with the EVM contracts using standard ABIs defined in [`src/lib/contracts.js`](file:///c:/Users/hp/Documents/GitHub/cowriechain/src/lib/contracts.js):
-
-### GroupSave ABI (`GROUP_SAVE_ABI`)
-| Function | Type | Inputs | Outputs | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| `members(uint256)` | View | `index` | `address` | Returns member address at index |
-| `isMember(address)` | View | `account` | `bool` | Checks circle membership |
-| `locked()` | View | — | `bool` | True if member recruitment is closed |
-| `currentRound()` | View | — | `uint256` | Current active rotation cycle index |
-| `roundTotal(uint256)` | View | `roundId` | `uint256` | Total tokens accumulated in specified round |
-| `roundFinalized(uint256)` | View | `roundId` | `bool` | Whether round payouts are locked & verified |
-| `claimable(address)` | View | `account` | `uint256` | Amount available for designated recipient to claim |
-| `collateral(address)` | View | `account` | `uint256` | Collateral balance staked by account |
-| `contributionAmount()` | View | — | `uint256` | Required periodic deposit per member |
-| `maxMembers()` | View | — | `uint256` | Capacity limit for circle members |
-| `totalRounds()` | View | — | `uint256` | Total rounds in a full circle lifecycle |
-| `join()` | Mutating | — | — | Joins the circle before locking |
-| `lock()` | Mutating | — | — | Freezes membership and enables round start |
-| `depositCollateral(uint256)` | Mutating | `amount` | — | Stakes security deposit |
-| `contribute()` | Mutating | — | — | Pays user's share for current cycle |
-| `finalizeRound()` | Mutating | — | — | Closes current cycle and sets claimable balance |
-| `claim()` | Mutating | — | — | Recipient withdraws the completed cycle pot |
-| `releaseCollateral()` | Mutating | — | — | Returns staked collateral once all rounds complete |
-| `togglePause()` | Mutating | — | — | Emergency circuit breaker |
-
-### SavingsGoal ABI (`SAVINGS_GOAL_ABI`)
-| Function | Type | Inputs | Outputs | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| `goalName()` | View | — | `string` | Label/title of the vault goal |
-| `targetAmount()` | View | — | `uint256` | Target savings amount (in token base units) |
-| `deadline()` | View | — | `uint256` | Unix timestamp of timelock maturity |
-| `saved()` | View | — | `uint256` | Total deposited balance |
-| `withdrawn()` | View | — | `bool` | Whether vault funds have already been claimed |
-| `progressBps()` | View | — | `uint256` | Progress represented in basis points (100% = 10,000 bps) |
-| `contribute(uint256)` | Mutating | `amount` | — | Deposits tokens into the goal vault |
-| `withdraw()` | Mutating | — | — | Full withdrawal upon maturity or target hit (0% fee) |
-| `withdrawEarly()` | Mutating | — | — | Early withdrawal with 5% penalty recycled to rewards |
-
-### MockUSDC ABI (`MOCK_USDC_ABI`)
-- `decimals()`: Returns `6`
-- `balanceOf(address account)`: Returns current balance
-- `allowance(address owner, address spender)`: Queries token approval limits
-- `approve(address spender, uint256 value)`: Authorizes vault or circle to pull funds
-- `transfer(address to, uint256 value)`: Transfers tokens
-- `mint(address to, uint256 amount)`: Test faucet minting
-
----
-
-## 🛠 Application Architecture & Tech Stack
-
-- **Framework**: [Next.js 14](https://nextjs.org/) (App Router, Client Components, Server-side Metadata)
-- **Language**: JavaScript (ES6+), React 18
-- **Styling**: [Tailwind CSS v4](https://tailwindcss.com/) with PostCSS
-- **Animations**: [Framer Motion](https://www.framer-motion.com/) (Spring dynamics, interactive tilt cards, scroll-triggered reveals)
-- **Web3 Integrations**:
-  - [Wagmi 2](https://wagmi.sh/): React hooks for contract read/write interactions and transaction lifecycle
-  - [Viem 2](https://viem.sh/): EVM client, ABI encoding, and cryptographic utilities
-  - [RainbowKit 2](https://www.rainbowkit.com/): Self-custody wallet connection modal
-  - [TanStack React Query 5](https://tanstack.com/query): Asynchronous query caching and state orchestration
-- **Typography & Icons**: Google Fonts (Sora, Inter, JetBrains Mono) & Google Material Symbols
-
----
-
-## 📂 Project Directory Structure
+The CowrieChain repository is organized into three independently buildable and deployable packages:
 
 ```text
 cowriechain/
-├── public/                 # Static assets and icons
-├── src/
-│   ├── app/                # Next.js App Router routes
-│   │   ├── auth/           # Wallet authentication screen
-│   │   ├── circles/        # ROSCA community management
-│   │   │   ├── [id]/       # Circle detail view & round tracker
-│   │   │   ├── join/       # Circle discovery and joining
-│   │   │   └── new/        # Circle creation wizard
-│   │   ├── dashboard/      # User metrics overview & portfolio stats
-│   │   ├── goals/          # Personal commitment vaults
-│   │   │   ├── [id]/       # Vault detail, deposit & early exit modal
-│   │   │   └── new/        # Vault setup form
-│   │   ├── rewards/        # Protocol reward pool & consistency claims
-│   │   ├── globals.css     # Global styles and Tailwind configuration
-│   │   ├── layout.js       # App root layout with font imports
-│   │   ├── page.js         # Landing page
-│   │   └── providers.js    # RainbowKit, Wagmi & React Query setup
-│   ├── components/         # Modular UI components
-│   │   ├── landing/        # Header, Hero, Steps, ValueProps, FAQ, etc.
-│   │   └── Sidebar.js      # Global navigation shell for authenticated pages
-│   ├── hooks/              # Custom React hooks (useReveal, etc.)
-│   └── lib/
-│       └── contracts.js    # Contract addresses, ABIs & currency formatters
-├── eslint.config.mjs       # Linting configurations
-├── next.config.mjs         # Next.js framework configuration
-├── package.json            # Dependencies and scripts
-└── pnpm-workspace.yaml     # Workspace build settings
+├── contract/             # EVM Smart Contracts & Foundry Suite
+│   ├── src/                  # Solidity 0.8.20 sources (GroupSave, GroupSaveFactory, SavingsGoal, MockUSDC)
+│   ├── test/                 # Foundry test suites (38 automated unit & integration tests)
+│   ├── script/               # Foundry deployment scripts (Deploy.s.sol)
+│   ├── deployments/          # Sepolia deployment registry (sepolia.json)
+│   ├── foundry.toml          # Foundry profile for contract directory execution
+│   └── README.md             # Smart contract specifications
+├── backend/              # Node.js / Express API & Keeper Service (Render)
+│   ├── src/
+│   │   ├── config/           # Environment and contract configuration
+│   │   ├── controllers/      # Route controllers (health, circles, vaults, rewards, relayer)
+│   │   ├── services/         # Blockchain Viem service, indexer, relayer bot
+│   │   ├── middleware/       # Address validation, pagination, errorHandler
+│   │   ├── routes/           # Express router endpoints
+│   │   └── server.js         # Express app entrypoint with Helmet and dynamic CORS
+│   ├── test/                 # Automated Node.js unit tests (node:test)
+│   ├── .env.example          # Template for backend environment variables
+│   └── package.json          # Express, Viem, Helmet, CORS dependencies
+├── frontend/             # Next.js 14 App Router Web3 Application (Vercel)
+│   ├── src/
+│   │   ├── app/              # Routes: /, /auth, /dashboard, /circles, /goals, /rewards
+│   │   ├── components/       # Responsive layouts, Sidebar drawer, Landing sections
+│   │   ├── hooks/            # Custom Web3 & UI interaction hooks
+│   │   └── lib/contracts.js  # Centralized contract addresses, ABIs, and formatters
+│   ├── public/               # Static icons, branding assets, and SVGs
+│   ├── vercel.json           # Vercel security headers and routing config
+│   ├── .env.example          # Template for frontend environment variables
+│   └── package.json          # Next.js 14, React 18, Wagmi, Viem, RainbowKit
+├── lib/                  # Foundry Git Submodules
+│   ├── forge-std/            # Foundry standard test & script library
+│   └── openzeppelin-contracts/ # OpenZeppelin audited ERC-20, Ownable, ReentrancyGuard
+├── scripts/              # Shared Monorepo Tooling
+│   └── extract-abis.js       # Extracts clean ABIs from Foundry artifacts to frontend & backend
+├── .gitmodules           # Submodule tracking for lib/forge-std & lib/openzeppelin-contracts
+├── foundry.toml          # Root Foundry profile for root-level test execution
+├── remappings.txt        # Solidity import remappings
+├── render.yaml           # Declarative Blueprint for Render backend deployment
+├── vercel.json           # Monorepo fallback Vercel configuration
+├── package.json          # Monorepo root scripts
+└── pnpm-workspace.yaml   # pnpm monorepo workspace definition
 ```
 
 ---
 
-## 🚀 Getting Started
+## ⚙️ Smart Contract Architecture
+
+1. **`GroupSaveFactory.sol`**:
+   - Deploys new `GroupSave` circles with verified parameters.
+   - Maintains an on-chain index of circles per user address (`_userCircles`) to eliminate third-party indexing dependency for initial queries.
+
+2. **`GroupSave.sol`**:
+   - Rotational savings circle (ROSCA) with Model B collateral hold-back.
+   - Enforces a 1-contribution collateral stake upon joining.
+   - Conducts a random payout order shuffle via `prevrandao` when the circle starts.
+   - Enforces a 5% late fee during the grace period and permissionless automated round resolution (`resolveRound()`).
+
+3. **`SavingsGoal.sol` (`SavingsVault`)**:
+   - Multi-goal commitment vault where users create isolated target savings goals.
+   - Enforces a 10% penalty fee on early withdrawals, directed to `treasury` to protect savings discipline.
+   - Allows penalty-free withdrawal once target amount or deadline is reached.
+
+4. **`MockUSDC.sol`**:
+   - Standard 6-decimal ERC-20 replicating live USDC on Sepolia testnet.
+
+---
+
+## 🚀 Local Development
 
 ### Prerequisites
-- [Node.js](https://nodejs.org/) `>= 18.18.0`
-- [pnpm](https://pnpm.io/) `>= 9.0.0` (or `npm` / `yarn`)
-- An EVM-compatible browser wallet (MetaMask, Rabby, Rainbow, etc.)
+- Node.js >= 18.x
+- `pnpm` (or `npm`)
+- [Foundry](https://getfoundry.sh/) (`forge`, `cast`)
+- Git
 
-### Installation
-Clone the repository and install dependencies:
+### Initial Setup
 ```bash
-git clone https://github.com/your-username/cowriechain.git
+# 1. Clone the repository with submodules
+git clone --recurse-submodules https://github.com/your-username/cowriechain.git
 cd cowriechain
+
+# 2. If submodules were not cloned recursively:
+git submodule update --init --recursive
+
+# 3. Install dependencies across frontend and backend
 pnpm install
 ```
 
-### Environment Variables
-Create a `.env.local` file in the root directory:
-```env
-# Address of the deployed MockUSDC or stablecoin on Sepolia
-NEXT_PUBLIC_MOCK_USDC=0x0000000000000000000000000000000000000000
-
-# WalletConnect Cloud Project ID (get one at https://cloud.reown.com)
-NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id_here
-```
-
-### Running Locally
-Run the development server:
+### Running Applications
 ```bash
+# Start frontend only (http://localhost:3000)
 pnpm dev
-```
-Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-Build for production:
+# Start backend only (http://localhost:5000)
+pnpm dev:backend
+
+# Or navigate directly into individual folders:
+cd frontend && npm run dev
+cd backend && npm run dev
+```
+
+### Running Automated Tests
 ```bash
-pnpm build
-pnpm start
+# Run backend tests (7 unit & integration tests)
+pnpm test:backend
+# or: cd backend && npm test
+
+# Run Foundry contract tests (38 tests)
+pnpm test:contracts
+# or: forge test
+# or: cd contract && forge test
+```
+
+### ABI Synchronization
+Whenever smart contracts are recompiled:
+```bash
+pnpm export:abis
+# Copies exact extracted ABIs to frontend/src/lib/abis/ and backend/src/abis/
 ```
 
 ---
 
-## ⛓ Smart Contract Deployment & Integration
+## 🌐 Deployment Guide
 
-1. **Compile & Deploy**:
-   - You can compile and deploy the `GroupSave`, `SavingsGoal`, and `MockUSDC` contracts using [Hardhat](https://hardhat.org/), [Foundry](https://book.getfoundry.sh/), or [Remix IDE](https://remix.ethereum.org/).
-   - Deploy to **Ethereum Sepolia** (Chain ID: `11155111`).
-2. **Update Contract Addresses**:
-   - Open [`src/lib/contracts.js`](file:///c:/Users/hp/Documents/GitHub/cowriechain/src/lib/contracts.js) and populate the `ADDRESSES` object with your deployed contract instances:
-     ```javascript
-     export const ADDRESSES = {
-       mockUSDC: process.env.NEXT_PUBLIC_MOCK_USDC || "0xYourMockUSDCAddress",
-       groupSave: "0xYourDeployedGroupSaveAddress",
-       savingsGoal: "0xYourDeployedSavingsGoalAddress",
-     };
-     ```
-3. **Fund Test Accounts**:
-   - Call `mint(userAddress, 10000000000)` (10,000 mUSDC with 6 decimals) to provide test capital on Sepolia.
+CowrieChain is architected to allow **independent, zero-friction deployments** for both the backend and frontend.
+
+### 1. Deploying Backend to Render
+
+The backend is completely self-contained in `backend/` and includes an automated health check endpoint at `/api/health`.
+
+#### Option A: Declarative Blueprint (Recommended)
+1. Go to [Render Dashboard](https://dashboard.render.com/) -> **Blueprints**.
+2. Connect your GitHub repository.
+3. Render reads `render.yaml` automatically:
+   - Root Directory: `backend`
+   - Build Command: `npm install`
+   - Start Command: `npm start`
+   - Health Check Path: `/api/health`
+
+#### Option B: Manual Web Service Setup
+1. In Render Dashboard, click **New +** -> **Web Service**.
+2. Select your repository.
+3. Configure settings:
+   - **Name**: `cowriechain-backend`
+   - **Root Directory**: `backend`
+   - **Environment**: `Node`
+   - **Build Command**: `npm install`
+   - **Start Command**: `npm start`
+   - **Health Check Path**: `/api/health`
+4. Set **Environment Variables** (see `backend/.env.example`):
+   ```env
+   NODE_ENV=production
+   PORT=10000
+   CHAIN_ID=11155111
+   SEPOLIA_RPC_URL=https://rpc.sepolia.org
+   MOCK_USDC_ADDRESS=0x5368a612Ec647dd85d63351dca7CB6C36100103B
+   SAVINGS_VAULT_ADDRESS=0xFa2982961244C4652a30A3144D11D09400234987
+   GROUP_SAVE_FACTORY_ADDRESS=0x2d1bBE433d2571559c1f13e918d05Dbe11b3A275
+   CORS_ORIGIN=https://cowriechain.vercel.app,https://*.vercel.app
+   ```
+   *(Optional for automated round resolution bot: `RELAYER_PRIVATE_KEY` and `RELAYER_API_KEY`)*
 
 ---
 
-## 🛡 Security & Risk Disclosure
+### 2. Deploying Frontend to Vercel
 
-- **Non-Custodial**: Neither CowrieChain developers nor third-party collectors ever possess custody over user funds or private keys. All transfers are dictated by on-chain transactions initiated by wallet signatures.
-- **Collateral & Slashing**: Members participating in community circles should ensure they have sufficient liquidity to satisfy round contributions. Defaulting on a round allows the contract to forfeit pledged collateral to prevent loss to other circle members.
-- **Penalty Recycling**: Vault early withdrawals strictly incur a 5% penalty designed to disincentivize impulsive withdrawals; this penalty is programmatically redirected to the rewards pool and is non-reversible.
-- **Testnet Status**: Contracts are deployed on Sepolia Testnet for demonstration, audit, and pilot evaluation. Do not deploy production funds without a comprehensive smart contract audit.
+The frontend is a standard Next.js 14 App Router application in `frontend/`.
+
+#### Cleanest Monorepo Setup (Recommended)
+1. Go to [Vercel Dashboard](https://vercel.com/) -> **Add New Project**.
+2. Import your GitHub repository.
+3. In **Project Configuration**:
+   - **Root Directory**: Click *Edit* and select **`frontend`**.
+   - **Framework Preset**: `Next.js` (auto-detected).
+   - **Build Command**: Default (`npm run build` or `pnpm build`).
+   - **Output Directory**: Default (`.next`).
+4. Set **Environment Variables** (see `frontend/.env.example`):
+   ```env
+   NEXT_PUBLIC_CHAIN_ID=11155111
+   NEXT_PUBLIC_SEPOLIA_RPC_URL=https://rpc.sepolia.org
+   NEXT_PUBLIC_MOCK_USDC=0x5368a612Ec647dd85d63351dca7CB6C36100103B
+   NEXT_PUBLIC_SAVINGS_VAULT=0xFa2982961244C4652a30A3144D11D09400234987
+   NEXT_PUBLIC_GROUPSAVE_FACTORY=0x2d1bBE433d2571559c1f13e918d05Dbe11b3A275
+   NEXT_PUBLIC_API_URL=https://cowriechain-backend.onrender.com/api
+   NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_reown_project_id
+   ```
+5. Click **Deploy**.
 
 ---
 
-## 📄 Contributing & License
+### 3. Connecting Frontend and Backend
 
-Contributions are welcome! Please open an issue or submit a pull request for improvements, bug fixes, or feature suggestions.
+1. When your Vercel deployment finishes, copy its production URL (e.g., `https://cowriechain.vercel.app`).
+2. In your Render Dashboard, set `CORS_ORIGIN` to:
+   ```text
+   https://cowriechain.vercel.app,https://*.vercel.app
+   ```
+3. In your Vercel Dashboard, ensure `NEXT_PUBLIC_API_URL` points to your Render backend:
+   ```text
+   https://<your-render-app>.onrender.com/api
+   ```
+4. Re-deploy the frontend on Vercel so the production API URL is baked into the client bundle.
 
-Distributed under the **MIT License**. See `LICENSE` for details.
+---
+
+## 🔒 Security & Git Staging Safety
+
+### Environment File Safety
+- All sensitive configuration (`.env`, `.env.local`, `*.pem`, `*.key`) is strictly ignored in `.gitignore`.
+- Public templates (`.env.example`) are checked in to document all required environment keys.
+- **Never commit private keys, mnemonic phrases, or RPC provider keys.**
+
+### Git Submodules (`lib/`)
+The repository uses Git submodules for Foundry contract dependencies:
+- `lib/forge-std` (tracked at `v1.17.0`)
+- `lib/openzeppelin-contracts` (tracked at `v5.7.0`)
+
+Both are registered in `.gitmodules`. When staging changes, stage `.gitmodules` and the `lib/` gitlink entries (`git add .gitmodules lib/forge-std lib/openzeppelin-contracts`).
+
+---
+
+## 📄 License
+
+This project is licensed under the [MIT License](LICENSE).
