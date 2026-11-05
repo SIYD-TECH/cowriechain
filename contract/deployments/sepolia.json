@@ -1,0 +1,39 @@
+{
+  "network": "sepolia",
+  "chainId": 11155111,
+  "deployer": "0x97184EBAEB9FDCe449d5FbaF1311601005F8E811",
+  "treasury": "0x97184EBAEB9FDCe449d5FbaF1311601005F8E811",
+  "deployedAt": "2026-11-05T00:23:31Z",
+  "contracts": {
+    "MockUSDC": {
+      "address": "0x5368a612Ec647dd85d63351dca7CB6C36100103B",
+      "transactionHash": "0xdf8b502e5791c409a1c476819afa5f58d365704593bb492ec68daba6df6d57db",
+      "blockNumber": 12065611,
+      "constructorArgs": [],
+      "verified": true,
+      "etherscanUrl": "https://sepolia.etherscan.io/address/0x5368a612Ec647dd85d63351dca7CB6C36100103B#code"
+    },
+    "SavingsVault": {
+      "address": "0xFa2982961244C4652a30A3144D11D09400234987",
+      "transactionHash": "0x809adf07e6336c5e8ceb0d075b01a53fa3d0b1eab8891d0fc8ac7813c04f42d2",
+      "blockNumber": 12065612,
+      "constructorArgs": [
+        "0x5368a612Ec647dd85d63351dca7CB6C36100103B",
+        "0x97184EBAEB9FDCe449d5FbaF1311601005F8E811"
+      ],
+      "verified": true,
+      "etherscanUrl": "https://sepolia.etherscan.io/address/0xFa2982961244C4652a30A3144D11D09400234987#code"
+    },
+    "GroupSaveFactory": {
+      "address": "0x2d1bBE433d2571559c1f13e918d05Dbe11b3A275",
+      "transactionHash": "0x8fff1d7f5ba7b32c752d0c63b0e79cf1473b142647f61c65884db5a6816eb999",
+      "blockNumber": 12065662,
+      "constructorArgs": [
+        "0x5368a612Ec647dd85d63351dca7CB6C36100103B"
+      ],
+      "verified": true,
+      "etherscanUrl": "https://sepolia.etherscan.io/address/0x2d1bBE433d2571559c1f13e918d05Dbe11b3A275#code"
+    }
+  }
+}
+

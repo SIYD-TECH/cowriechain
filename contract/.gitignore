@@ -1,0 +1,15 @@
+# Foundry Artifacts
+out/
+cache/
+broadcast/
+foundry.lock
+
+# Secrets & Private Keys
+.env
+.env*.local
+*.pem
+*.key
+
+# Preserve example template
+!.env.example
+
