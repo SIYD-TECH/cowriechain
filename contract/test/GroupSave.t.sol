@@ -142,9 +142,28 @@ contract GroupSaveTest is Test {
 
         uint256 balanceBefore = token.balanceOf(alice);
         vm.prank(alice);
-        circle.leaveCircle();
+        circle.leave();
 
         assertEq(token.balanceOf(alice) - balanceBefore, CONTRIBUTION, "Stake refunded on leave");
+        assertEq(circle.stake(alice), 0);
+        assertFalse(circle.isMember(alice));
+    }
+
+    function test_LeaveCircle_RefundsStake() public {
+        vm.prank(creator);
+        address[] memory invitees = new address[](1);
+        invitees[0] = alice;
+        circle.invite(invitees);
+
+        vm.prank(alice);
+        circle.join();
+        assertEq(circle.stake(alice), CONTRIBUTION);
+
+        uint256 balanceBefore = token.balanceOf(alice);
+        vm.prank(alice);
+        circle.leaveCircle();
+
+        assertEq(token.balanceOf(alice) - balanceBefore, CONTRIBUTION, "Stake refunded on leaveCircle");
         assertEq(circle.stake(alice), 0);
         assertFalse(circle.isMember(alice));
     }

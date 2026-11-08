@@ -6,9 +6,9 @@ This directory contains the core smart contracts for the CowrieChain protocol, d
 
 | Contract | Address | Verification | Explorer |
 | :--- | :--- | :--- | :--- |
-| **`MockUSDC`** | `0x5368a612Ec647dd85d63351dca7CB6C36100103B` | **Verified** | [Etherscan](https://sepolia.etherscan.io/address/0x5368a612Ec647dd85d63351dca7CB6C36100103B#code) |
-| **`SavingsVault`** | `0xFa2982961244C4652a30A3144D11D09400234987` | **Verified** | [Etherscan](https://sepolia.etherscan.io/address/0xFa2982961244C4652a30A3144D11D09400234987#code) |
-| **`GroupSaveFactory`** | `0x2d1bBE433d2571559c1f13e918d05Dbe11b3A275` | **Verified** | [Etherscan](https://sepolia.etherscan.io/address/0x2d1bBE433d2571559c1f13e918d05Dbe11b3A275#code) |
+| **`MockUSDC`** | `0x639aB79330a2504e84E5a8D4846a6333bB4BC8d3` | **Verified** | [Etherscan](https://sepolia.etherscan.io/address/0x639aB79330a2504e84E5a8D4846a6333bB4BC8d3#code) |
+| **`SavingsVault`** | `0xfE4C229364Aba1478f0bE39c61778209f001561d` | **Verified** | [Etherscan](https://sepolia.etherscan.io/address/0xfE4C229364Aba1478f0bE39c61778209f001561d#code) |
+| **`GroupSaveFactory`** | `0xac6eb56fbbca66bf7d9a80c861ca6c90b114f8d1` | **Verified** | [Etherscan](https://sepolia.etherscan.io/address/0xac6eb56fbbca66bf7d9a80c861ca6c90b114f8d1#code) |
 
 - **Network**: Ethereum Sepolia (`Chain ID: 11155111`)
 - **Deployer & Treasury**: `0x97184EBAEB9FDCe449d5FbaF1311601005F8E811`

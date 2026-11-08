@@ -4,14 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "pnpm --filter cowriechain dev",
-    "dev:frontend": "pnpm --filter cowriechain dev",
-    "dev:backend": "pnpm --filter cowriechain-backend dev",
     "build": "pnpm --filter cowriechain build",
-    "build:frontend": "pnpm --filter cowriechain build",
     "lint": "pnpm --filter cowriechain lint",
-    "test:backend": "pnpm --filter cowriechain-backend test",
     "test:contracts": "forge test",
     "export:abis": "node scripts/extract-abis.js"
   }
 }
-

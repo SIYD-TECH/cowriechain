@@ -22,9 +22,9 @@ The CowrieChain smart contracts are deployed and verified on Ethereum Sepolia (`
 
 | Contract | Address | Verification | Explorer Link |
 | :--- | :--- | :--- | :--- |
-| **`MockUSDC`** | [`0x5368a612Ec647dd85d63351dca7CB6C36100103B`](https://sepolia.etherscan.io/address/0x5368a612Ec647dd85d63351dca7CB6C36100103B#code) | **Verified** | [Etherscan](https://sepolia.etherscan.io/address/0x5368a612Ec647dd85d63351dca7CB6C36100103B#code) |
-| **`SavingsVault`** | [`0xFa2982961244C4652a30A3144D11D09400234987`](https://sepolia.etherscan.io/address/0xFa2982961244C4652a30A3144D11D09400234987#code) | **Verified** | [Etherscan](https://sepolia.etherscan.io/address/0xFa2982961244C4652a30A3144D11D09400234987#code) |
-| **`GroupSaveFactory`** | [`0x2d1bBE433d2571559c1f13e918d05Dbe11b3A275`](https://sepolia.etherscan.io/address/0x2d1bBE433d2571559c1f13e918d05Dbe11b3A275#code) | **Verified** | [Etherscan](https://sepolia.etherscan.io/address/0x2d1bBE433d2571559c1f13e918d05Dbe11b3A275#code) |
+| **`MockUSDC`** | [`0x639aB79330a2504e84E5a8D4846a6333bB4BC8d3`](https://sepolia.etherscan.io/address/0x639aB79330a2504e84E5a8D4846a6333bB4BC8d3#code) | **Verified** | [Etherscan](https://sepolia.etherscan.io/address/0x639aB79330a2504e84E5a8D4846a6333bB4BC8d3#code) |
+| **`SavingsVault`** | [`0xfE4C229364Aba1478f0bE39c61778209f001561d`](https://sepolia.etherscan.io/address/0xfE4C229364Aba1478f0bE39c61778209f001561d#code) | **Verified** | [Etherscan](https://sepolia.etherscan.io/address/0xfE4C229364Aba1478f0bE39c61778209f001561d#code) |
+| **`GroupSaveFactory`** | [`0xac6eb56fbbca66bf7d9a80c861ca6c90b114f8d1`](https://sepolia.etherscan.io/address/0xac6eb56fbbca66bf7d9a80c861ca6c90b114f8d1#code) | **Verified** | [Etherscan](https://sepolia.etherscan.io/address/0xac6eb56fbbca66bf7d9a80c861ca6c90b114f8d1#code) |
 | **Sample Circle** | [`0x318ddca988eA36bC27A82e4CB9057a22D608e1f6`](https://sepolia.etherscan.io/address/0x318ddca988eA36bC27A82e4CB9057a22D608e1f6#code) | **Verified** | [Etherscan](https://sepolia.etherscan.io/address/0x318ddca988eA36bC27A82e4CB9057a22D608e1f6#code) |
 
 - **Protocol Deployer & Treasury**: `0x97184EBAEB9FDCe449d5FbaF1311601005F8E811`
@@ -217,11 +217,10 @@ The frontend is a standard Next.js 14 App Router application in `frontend/`.
    ```env
    NEXT_PUBLIC_CHAIN_ID=11155111
    NEXT_PUBLIC_SEPOLIA_RPC_URL=https://rpc.sepolia.org
-   NEXT_PUBLIC_MOCK_USDC=0x5368a612Ec647dd85d63351dca7CB6C36100103B
-   NEXT_PUBLIC_SAVINGS_VAULT=0xFa2982961244C4652a30A3144D11D09400234987
-   NEXT_PUBLIC_GROUPSAVE_FACTORY=0x2d1bBE433d2571559c1f13e918d05Dbe11b3A275
-   NEXT_PUBLIC_API_URL=https://cowriechain-backend.onrender.com/api
    NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_reown_project_id
+   NEXT_PUBLIC_MOCK_USDC_ADDRESS=0x639aB79330a2504e84E5a8D4846a6333bB4BC8d3
+   NEXT_PUBLIC_SAVINGS_VAULT_ADDRESS=0xfE4C229364Aba1478f0bE39c61778209f001561d
+   NEXT_PUBLIC_GROUP_SAVE_FACTORY_ADDRESS=0xac6eb56fbbca66bf7d9a80c861ca6c90b114f8d1
    ```
 5. Click **Deploy**.
 

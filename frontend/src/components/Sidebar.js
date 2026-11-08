@@ -5,17 +5,33 @@ import { usePathname } from "next/navigation";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { useAccount, useReadContract } from "wagmi";
+import { ADDRESSES, MOCK_USDC_ABI, fmtUSDC } from "@/lib/contracts";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
   { href: "/goals", label: "Goals", icon: "savings" },
   { href: "/circles", label: "Circles", icon: "groups" },
-  { href: "/rewards", label: "Rewards", icon: "toll" },
+  { href: "/faucet", label: "Faucet", icon: "water_drop", badge: "Free" },
+  { href: "/rewards", label: "Rewards", icon: "toll", badge: "Soon" },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { address, isConnected } = useAccount();
+
+  // Read mUSDC balance
+  const { data: balance } = useReadContract({
+    address: ADDRESSES.mockUSDC,
+    abi: MOCK_USDC_ABI,
+    functionName: "balanceOf",
+    args: address ? [address] : undefined,
+    query: {
+      enabled: !!address,
+      refetchInterval: 10000,
+    },
+  });
 
   // Close mobile drawer on route change
   useEffect(() => {
@@ -49,20 +65,33 @@ export default function Sidebar() {
           </Link>
 
           <nav className="mt-6 flex flex-col gap-1">
-            {NAV.map(({ href, label, icon }) => {
+            {NAV.map(({ href, label, icon, badge }) => {
               const active = pathname === href || (href !== "/" && pathname.startsWith(href));
               return (
                 <Link
                   key={href}
                   href={href}
-                  className={`h-11 px-3 rounded-[10px] flex items-center gap-2.5 text-[13px] font-medium transition-colors ${
+                  className={`h-11 px-3 rounded-[10px] flex items-center justify-between text-[13px] font-medium transition-colors ${
                     active
                       ? "bg-[rgba(43,181,154,0.12)] text-[#2BB59A] font-semibold"
                       : "text-[#9DB5AF] hover:bg-[rgba(246,241,231,0.05)] hover:text-[#F6F1E7]"
                   }`}
                 >
-                  <span className="material-symbols-outlined text-[20px]">{icon}</span>
-                  {label}
+                  <div className="flex items-center gap-2.5">
+                    <span className="material-symbols-outlined text-[20px]">{icon}</span>
+                    {label}
+                  </div>
+                  {badge && (
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                        badge === "Free"
+                          ? "bg-[rgba(43,181,154,0.18)] text-[#2BB59A] border border-[rgba(43,181,154,0.3)]"
+                          : "bg-[rgba(246,241,231,0.08)] text-[#9DB5AF]"
+                      }`}
+                    >
+                      {badge}
+                    </span>
+                  )}
                 </Link>
               );
             })}
@@ -70,6 +99,23 @@ export default function Sidebar() {
         </div>
 
         <div className="pt-4 border-t border-[rgba(246,241,231,0.08)] flex flex-col gap-2.5">
+          {isConnected && (
+            <div className="px-3 py-2.5 rounded-xl bg-[rgba(246,241,231,0.04)] border border-[rgba(246,241,231,0.08)]">
+              <div className="flex items-center justify-between text-[11px] text-[#9DB5AF]">
+                <span>mUSDC Balance</span>
+                <Link
+                  href="/faucet"
+                  className="text-[#2BB59A] hover:underline font-semibold flex items-center gap-0.5 text-[10px]"
+                >
+                  Faucet <span className="material-symbols-outlined text-[10px]">arrow_forward</span>
+                </Link>
+              </div>
+              <div className="sora text-[14px] font-bold text-[#F6F1E7] mt-0.5 truncate">
+                {fmtUSDC(balance, "")} <span className="text-[11px] text-[#2BB59A] font-normal">mUSDC</span>
+              </div>
+            </div>
+          )}
+
           <ConnectButton accountStatus="address" chainStatus="icon" showBalance={false} />
           <div className="flex items-center justify-between px-1">
             <span className="text-[11px] text-[#9DB5AF]">Network</span>
@@ -133,21 +179,34 @@ export default function Sidebar() {
                   Navigation
                 </div>
                 <nav className="flex flex-col gap-1.5">
-                  {NAV.map(({ href, label, icon }) => {
+                  {NAV.map(({ href, label, icon, badge }) => {
                     const active = pathname === href || (href !== "/" && pathname.startsWith(href));
                     return (
                       <Link
                         key={href}
                         href={href}
                         onClick={() => setMobileOpen(false)}
-                        className={`h-11 px-3 rounded-[10px] flex items-center gap-3 text-[14px] font-medium transition-colors ${
+                        className={`h-11 px-3 rounded-[10px] flex items-center justify-between text-[14px] font-medium transition-colors ${
                           active
                             ? "bg-[rgba(43,181,154,0.15)] text-[#2BB59A] font-semibold"
                             : "text-[#9DB5AF] hover:bg-white/[0.05] hover:text-white"
                         }`}
                       >
-                        <span className="material-symbols-outlined text-[22px]">{icon}</span>
-                        {label}
+                        <div className="flex items-center gap-3">
+                          <span className="material-symbols-outlined text-[22px]">{icon}</span>
+                          {label}
+                        </div>
+                        {badge && (
+                          <span
+                            className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                              badge === "Free"
+                                ? "bg-[rgba(43,181,154,0.18)] text-[#2BB59A] border border-[rgba(43,181,154,0.3)]"
+                                : "bg-[rgba(246,241,231,0.08)] text-[#9DB5AF]"
+                            }`}
+                          >
+                            {badge}
+                          </span>
+                        )}
                       </Link>
                     );
                   })}
@@ -155,6 +214,24 @@ export default function Sidebar() {
               </div>
 
               <div className="pt-4 border-t border-[rgba(246,241,231,0.08)] flex flex-col gap-3">
+                {isConnected && (
+                  <div className="px-3 py-2.5 rounded-xl bg-[rgba(246,241,231,0.04)] border border-[rgba(246,241,231,0.08)]">
+                    <div className="flex items-center justify-between text-[11px] text-[#9DB5AF]">
+                      <span>mUSDC Balance</span>
+                      <Link
+                        href="/faucet"
+                        onClick={() => setMobileOpen(false)}
+                        className="text-[#2BB59A] hover:underline font-semibold flex items-center gap-0.5 text-[10px]"
+                      >
+                        Faucet <span className="material-symbols-outlined text-[10px]">arrow_forward</span>
+                      </Link>
+                    </div>
+                    <div className="sora text-[14px] font-bold text-[#F6F1E7] mt-0.5 truncate">
+                      {fmtUSDC(balance, "")} <span className="text-[11px] text-[#2BB59A] font-normal">mUSDC</span>
+                    </div>
+                  </div>
+                )}
+
                 <ConnectButton accountStatus="address" chainStatus="icon" showBalance={false} />
                 <div className="flex items-center justify-between px-1 text-[11px] text-[#9DB5AF]">
                   <span>Active Network</span>

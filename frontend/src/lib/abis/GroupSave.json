@@ -646,6 +646,13 @@
   },
   {
     "type": "function",
+    "name": "leave",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "leaveCircle",
     "inputs": [],
     "outputs": [],
@@ -1071,12 +1078,5 @@
         "internalType": "address"
       }
     ]
-  },
-  {
-    "type": "function",
-    "name": "leave",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
   }
 ]

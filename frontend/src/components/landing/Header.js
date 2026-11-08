@@ -47,17 +47,18 @@ export default function Header() {
         </nav>
 
         <div className="flex items-center gap-3">
-          <a
-            href="#"
-            className="hidden md:inline-flex text-[11px] font-semibold tracking-widest uppercase text-[#bccabf] hover:text-white transition-colors"
+          <Link
+            href="/faucet"
+            className="hidden md:inline-flex text-[11px] font-semibold tracking-widest uppercase text-[#62dd9e] hover:text-white transition-colors items-center gap-1"
           >
-            Docs
-          </a>
+            <span className="material-symbols-outlined text-[15px]">water_drop</span>
+            Faucet
+          </Link>
           <Link
             href="/auth"
             className="hidden sm:inline-flex px-5 py-2.5 bg-[#1aa56c] hover:bg-[#62dd9e] text-white hover:text-[#002111] rounded-xl text-[11px] font-semibold tracking-widest uppercase transition-colors shadow-[0_4px_16px_rgba(26,165,108,.22)] active:scale-[0.98]"
           >
-            Connect wallet
+            Launch App
           </Link>
           <button
             onClick={() => setOpen((v) => !v)}
@@ -91,11 +92,19 @@ export default function Header() {
               </a>
             ))}
             <Link
+              href="/faucet"
+              onClick={() => setOpen(false)}
+              className="px-3 py-2.5 rounded-xl text-[14px] text-[#62dd9e] hover:bg-white/[0.06] flex items-center gap-2 font-medium"
+            >
+              <span className="material-symbols-outlined text-[18px]">water_drop</span>
+              Testnet Faucet
+            </Link>
+            <Link
               href="/auth"
               onClick={() => setOpen(false)}
               className="mt-2 w-full text-center px-5 py-3 bg-[#1aa56c] text-white rounded-xl text-[13px] font-semibold"
             >
-              Connect wallet
+              Launch App
             </Link>
           </motion.div>
         )}

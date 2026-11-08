@@ -4,24 +4,41 @@
  * tests read operations across all contracts, and verifies contract state and mathematical invariants.
  */
 
+const fs = require("fs");
 const path = require("path");
-require(path.join(__dirname, "../backend/node_modules/dotenv")).config({ path: path.join(__dirname, "../contract/.env") });
-require(path.join(__dirname, "../backend/node_modules/dotenv")).config({ path: path.join(__dirname, "../backend/.env") });
+
+// Load contract/.env manually
+const envPath = path.join(__dirname, "../contract/.env");
+if (fs.existsSync(envPath)) {
+  const envContent = fs.readFileSync(envPath, "utf-8");
+  envContent.split("\n").forEach((line) => {
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith("#")) {
+      const idx = trimmed.indexOf("=");
+      if (idx > -1) {
+        const key = trimmed.slice(0, idx).trim();
+        const val = trimmed.slice(idx + 1).trim();
+        if (!process.env[key]) {
+          process.env[key] = val;
+        }
+      }
+    }
+  });
+}
 
 const {
   createPublicClient,
   createWalletClient,
   http,
   formatUnits,
-  parseUnits,
-} = require(path.join(__dirname, "../backend/node_modules/viem"));
+} = require(path.join(__dirname, "../frontend/node_modules/viem"));
 const { privateKeyToAccount } = require(path.join(
   __dirname,
-  "../backend/node_modules/viem/accounts"
+  "../frontend/node_modules/viem/accounts"
 ));
 const { sepolia } = require(path.join(
   __dirname,
-  "../backend/node_modules/viem/chains"
+  "../frontend/node_modules/viem/chains"
 ));
 
 const MockUSDCAbi = require(path.join(
@@ -53,7 +70,7 @@ if (!RPC_URL) {
 
 const publicClient = createPublicClient({
   chain: sepolia,
-  transport: http(RPC_URL),
+  transport: http(RPC_URL, { timeout: 30000, retryCount: 3 }),
 });
 
 let walletAccount;
@@ -66,7 +83,7 @@ if (process.env.PRIVATE_KEY) {
   walletClient = createWalletClient({
     account: walletAccount,
     chain: sepolia,
-    transport: http(RPC_URL),
+    transport: http(RPC_URL, { timeout: 30000, retryCount: 3 }),
   });
 }
 
@@ -86,35 +103,45 @@ async function main() {
 
   // 2. MockUSDC Verification
   console.log(`\n[2] MockUSDC Integration (${MockUSDC.address}):`);
-  const [name, symbol, decimals, totalSupply] = await Promise.all([
-    publicClient.readContract({
-      address: MockUSDC.address,
-      abi: MockUSDCAbi,
-      functionName: "name",
-    }),
-    publicClient.readContract({
-      address: MockUSDC.address,
-      abi: MockUSDCAbi,
-      functionName: "symbol",
-    }),
-    publicClient.readContract({
-      address: MockUSDC.address,
-      abi: MockUSDCAbi,
-      functionName: "decimals",
-    }),
-    publicClient.readContract({
-      address: MockUSDC.address,
-      abi: MockUSDCAbi,
-      functionName: "totalSupply",
-    }),
-  ]);
+  const name = await publicClient.readContract({
+    address: MockUSDC.address,
+    abi: MockUSDCAbi,
+    functionName: "name",
+  });
+  const symbol = await publicClient.readContract({
+    address: MockUSDC.address,
+    abi: MockUSDCAbi,
+    functionName: "symbol",
+  });
+  const decimals = await publicClient.readContract({
+    address: MockUSDC.address,
+    abi: MockUSDCAbi,
+    functionName: "decimals",
+  });
+  const totalSupply = await publicClient.readContract({
+    address: MockUSDC.address,
+    abi: MockUSDCAbi,
+    functionName: "totalSupply",
+  });
+  const faucetCooldown = await publicClient.readContract({
+    address: MockUSDC.address,
+    abi: MockUSDCAbi,
+    functionName: "FAUCET_COOLDOWN",
+  });
+  const faucetAmount = await publicClient.readContract({
+    address: MockUSDC.address,
+    abi: MockUSDCAbi,
+    functionName: "FAUCET_AMOUNT",
+  });
 
   console.log(`    Token Name: ${name}`);
   console.log(`    Symbol: ${symbol}`);
   console.log(`    Decimals: ${decimals} (USDC standard)`);
   console.log(`    Total Supply: ${formatUnits(totalSupply, decimals)} ${symbol}`);
+  console.log(`    Faucet Cooldown: ${Number(faucetCooldown) / 3600} hours`);
+  console.log(`    Faucet Amount: ${formatUnits(faucetAmount, decimals)} ${symbol}`);
   if (decimals !== 6) throw new Error("USDC must have 6 decimals!");
-  console.log(`    ✓ MockUSDC ABI and state verified.`);
+  console.log(`    ✓ MockUSDC ABI, Faucet, and state verified.`);
 
   if (walletAccount) {
     const bal = await publicClient.readContract({
@@ -123,28 +150,34 @@ async function main() {
       functionName: "balanceOf",
       args: [walletAccount.address],
     });
-    console.log(`    Test Wallet Balance: ${formatUnits(bal, decimals)} ${symbol}`);
+    console.log(`    Deployer Wallet Balance: ${formatUnits(bal, decimals)} ${symbol}`);
+
+    const [canClaim, remainingCooldown] = await publicClient.readContract({
+      address: MockUSDC.address,
+      abi: MockUSDCAbi,
+      functionName: "canClaimFaucet",
+      args: [walletAccount.address],
+    });
+    console.log(`    Deployer Faucet Status: canClaim=${canClaim}, cooldownRemaining=${remainingCooldown}s`);
   }
 
   // 3. SavingsVault Verification
   console.log(`\n[3] SavingsVault Integration (${SavingsVault.address}):`);
-  const [vaultToken, treasury, penaltyBps] = await Promise.all([
-    publicClient.readContract({
-      address: SavingsVault.address,
-      abi: SavingsVaultAbi,
-      functionName: "token",
-    }),
-    publicClient.readContract({
-      address: SavingsVault.address,
-      abi: SavingsVaultAbi,
-      functionName: "treasury",
-    }),
-    publicClient.readContract({
-      address: SavingsVault.address,
-      abi: SavingsVaultAbi,
-      functionName: "PENALTY_BPS",
-    }),
-  ]);
+  const vaultToken = await publicClient.readContract({
+    address: SavingsVault.address,
+    abi: SavingsVaultAbi,
+    functionName: "token",
+  });
+  const treasury = await publicClient.readContract({
+    address: SavingsVault.address,
+    abi: SavingsVaultAbi,
+    functionName: "treasury",
+  });
+  const penaltyBps = await publicClient.readContract({
+    address: SavingsVault.address,
+    abi: SavingsVaultAbi,
+    functionName: "PENALTY_BPS",
+  });
 
   console.log(`    Underlying Token: ${vaultToken}`);
   console.log(`    Treasury: ${treasury}`);
@@ -174,24 +207,22 @@ async function main() {
 
   // 4. GroupSaveFactory Verification
   console.log(`\n[4] GroupSaveFactory Integration (${GroupSaveFactory.address}):`);
-  const [factoryToken, circleCount, allCircles] = await Promise.all([
-    publicClient.readContract({
-      address: GroupSaveFactory.address,
-      abi: GroupSaveFactoryAbi,
-      functionName: "token",
-    }),
-    publicClient.readContract({
-      address: GroupSaveFactory.address,
-      abi: GroupSaveFactoryAbi,
-      functionName: "circleCount",
-    }),
-    publicClient.readContract({
-      address: GroupSaveFactory.address,
-      abi: GroupSaveFactoryAbi,
-      functionName: "getCircles",
-      args: [0n, 10n],
-    }),
-  ]);
+  const factoryToken = await publicClient.readContract({
+    address: GroupSaveFactory.address,
+    abi: GroupSaveFactoryAbi,
+    functionName: "token",
+  });
+  const circleCount = await publicClient.readContract({
+    address: GroupSaveFactory.address,
+    abi: GroupSaveFactoryAbi,
+    functionName: "circleCount",
+  });
+  const allCircles = await publicClient.readContract({
+    address: GroupSaveFactory.address,
+    abi: GroupSaveFactoryAbi,
+    functionName: "getCircles",
+    args: [0n, 10n],
+  });
 
   console.log(`    Factory Token: ${factoryToken}`);
   console.log(`    Total Circles Created: ${circleCount}`);
@@ -211,28 +242,26 @@ async function main() {
     });
     console.log(`    isCircle verified by Factory: ${isReg}`);
 
-    const [info, members, payoutOrder, canResolve] = await Promise.all([
-      publicClient.readContract({
-        address: circleAddr,
-        abi: GroupSaveAbi,
-        functionName: "getInfo",
-      }),
-      publicClient.readContract({
-        address: circleAddr,
-        abi: GroupSaveAbi,
-        functionName: "getMembers",
-      }),
-      publicClient.readContract({
-        address: circleAddr,
-        abi: GroupSaveAbi,
-        functionName: "getPayoutOrder",
-      }),
-      publicClient.readContract({
-        address: circleAddr,
-        abi: GroupSaveAbi,
-        functionName: "canResolve",
-      }),
-    ]);
+    const info = await publicClient.readContract({
+      address: circleAddr,
+      abi: GroupSaveAbi,
+      functionName: "getInfo",
+    });
+    const members = await publicClient.readContract({
+      address: circleAddr,
+      abi: GroupSaveAbi,
+      functionName: "getMembers",
+    });
+    const payoutOrder = await publicClient.readContract({
+      address: circleAddr,
+      abi: GroupSaveAbi,
+      functionName: "getPayoutOrder",
+    });
+    const canResolve = await publicClient.readContract({
+      address: circleAddr,
+      abi: GroupSaveAbi,
+      functionName: "canResolve",
+    });
 
     const statusNames = ["Open", "Active", "Completed", "Cancelled"];
     console.log(`    Circle Name: "${info.name}"`);

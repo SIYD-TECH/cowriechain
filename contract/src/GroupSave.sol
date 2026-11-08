@@ -198,8 +198,17 @@ contract GroupSave is ReentrancyGuard {
         if (members.length == memberCount) _start();
     }
 
+    /// @notice Leave before the circle starts and get the stake back (matching guide interface).
+    function leave() external nonReentrant {
+        _leave();
+    }
+
     /// @notice Leave before the circle starts and get the stake back.
     function leaveCircle() external nonReentrant {
+        _leave();
+    }
+
+    function _leave() internal {
         require(status == Status.Open, "NotOpen");
         require(isMember[msg.sender], "NotMember");
 

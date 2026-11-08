@@ -1,4 +1,5 @@
 "use client";
+
 import { useAccount, useReadContract } from "wagmi";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -9,46 +10,58 @@ import {
   MOCK_USDC_ABI,
   SAVINGS_VAULT_ABI,
   GROUP_SAVE_FACTORY_ABI,
-  CONTRACT_ADDRESSES,
+  ADDRESSES,
   fmtUSDC,
 } from "@/lib/contracts";
 
 export default function DashboardPage() {
-  const { isConnected, address: userAddress } = useAccount();
+  const { isConnected, address: userAddress, status } = useAccount();
   const router = useRouter();
 
+  // Redirect only when truly disconnected (not during reconnecting on page refresh)
   useEffect(() => {
-    if (!isConnected) router.replace("/auth");
-  }, [isConnected, router]);
+    if (status === "disconnected") {
+      router.replace("/auth");
+    }
+  }, [status, router]);
 
-  // Read wallet USDC balance
+  // Read wallet mUSDC balance
   const { data: usdcBalance } = useReadContract({
-    address: CONTRACT_ADDRESSES.mockUsdc,
+    address: ADDRESSES.mockUSDC,
     abi: MOCK_USDC_ABI,
     functionName: "balanceOf",
     args: userAddress ? [userAddress] : undefined,
-    query: { enabled: !!userAddress && isConnected },
+    query: {
+      enabled: !!userAddress && isConnected,
+      refetchInterval: 10000,
+    },
   });
 
   // Read user goals
   const { data: rawGoals, isLoading: isGoalsLoading } = useReadContract({
-    address: CONTRACT_ADDRESSES.savingsVault,
+    address: ADDRESSES.savingsVault,
     abi: SAVINGS_VAULT_ABI,
     functionName: "getGoals",
     args: userAddress ? [userAddress] : undefined,
-    query: { enabled: !!userAddress && isConnected },
+    query: {
+      enabled: !!userAddress && isConnected,
+      refetchInterval: 10000,
+    },
   });
 
   // Read user circles
   const { data: userCircles, isLoading: isCirclesLoading } = useReadContract({
-    address: CONTRACT_ADDRESSES.groupSaveFactory,
+    address: ADDRESSES.groupSaveFactory,
     abi: GROUP_SAVE_FACTORY_ABI,
     functionName: "getUserCircles",
     args: userAddress ? [userAddress] : undefined,
-    query: { enabled: !!userAddress && isConnected },
+    query: {
+      enabled: !!userAddress && isConnected,
+      refetchInterval: 10000,
+    },
   });
 
-  if (!isConnected) return null;
+  if (status === "disconnected") return null;
 
   const goals = (rawGoals || []).map((g, idx) => ({
     id: idx,
@@ -64,27 +77,33 @@ export default function DashboardPage() {
   const circleAddresses = userCircles || [];
 
   return (
-    <div className="min-h-screen bg-[#041711] flex flex-col lg:flex-row">
+    <div className="min-h-screen bg-[#0E2927] text-[#F6F1E7]">
       <Sidebar />
-      <main className="flex-1 lg:ml-[240px] w-full min-w-0 p-4 lg:p-8 space-y-6">
+      <main className="lg:pl-[240px] px-4 sm:px-6 lg:px-8 py-8 max-w-7xl mx-auto space-y-6">
         {/* Welcome row */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-[rgba(246,241,231,0.06)]">
           <div>
-            <h1 className="sora text-[22px] font-bold text-white">Dashboard</h1>
-            <p className="text-[13px] text-[#bccabf] mt-0.5">
-              Decentralized rotating savings and automated personal vaults on Sepolia.
+            <h1 className="sora text-2xl sm:text-3xl font-bold text-[#F6F1E7]">Dashboard</h1>
+            <p className="text-sm text-[#9DB5AF] mt-1">
+              Decentralized rotating savings and automated personal vaults on Ethereum Sepolia.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <Link
+              href="/faucet"
+              className="px-3.5 py-2 bg-[rgba(43,181,154,0.12)] hover:bg-[rgba(43,181,154,0.22)] border border-[rgba(43,181,154,0.3)] text-[#2BB59A] rounded-xl text-xs sm:text-sm font-semibold transition-colors flex items-center gap-1.5"
+            >
+              <span className="material-symbols-outlined text-[16px]">water_drop</span> Faucet
+            </Link>
             <Link
               href="/goals/new"
-              className="px-4 py-2 bg-white/[0.06] hover:bg-white/[0.1] text-white rounded-xl text-[12px] font-semibold transition-colors flex items-center gap-1.5"
+              className="px-3.5 py-2 bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.1] text-white rounded-xl text-xs sm:text-sm font-semibold transition-colors flex items-center gap-1.5"
             >
               <span className="material-symbols-outlined text-[16px]">add</span> New Goal
             </Link>
             <Link
               href="/circles/new"
-              className="px-4 py-2 bg-[#1aa56c] hover:bg-[#62dd9e] text-white hover:text-[#002111] rounded-xl text-[12px] font-semibold transition-colors flex items-center gap-1.5"
+              className="px-3.5 py-2 bg-[#2BB59A] hover:bg-[#259e87] text-[#0E2927] rounded-xl text-xs sm:text-sm font-semibold transition-colors flex items-center gap-1.5 shadow-[0_2px_10px_rgba(43,181,154,0.3)]"
             >
               <span className="material-symbols-outlined text-[16px]">group_add</span> New Circle
             </Link>
@@ -96,18 +115,18 @@ export default function DashboardPage() {
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-[#10231d] border border-white/[0.06] rounded-2xl p-5"
+            className="bg-[#143734] border border-[rgba(246,241,231,0.08)] rounded-2xl p-5"
           >
-            <div className="text-[11px] tracking-widest uppercase text-[#bccabf]">
-              Locked in Vaults
+            <div className="text-[11px] font-semibold tracking-wider uppercase text-[#9DB5AF]">
+              Locked in Personal Vaults
             </div>
-            <div className="sora text-[26px] font-bold mt-1 text-white">
-              ${fmtUSDC(totalLockedInVaults)}
-              <span className="text-[13px] font-normal text-[#bccabf] ml-1">mUSDC</span>
+            <div className="sora text-2xl sm:text-3xl font-bold mt-1 text-[#F6F1E7]">
+              {fmtUSDC(totalLockedInVaults, "")}
+              <span className="text-xs sm:text-sm font-normal text-[#2BB59A] ml-1.5">mUSDC</span>
             </div>
-            <div className="text-[11px] text-[#62dd9e] mt-1 flex items-center gap-1">
-              <span className="material-symbols-outlined text-[14px]">account_balance_wallet</span>
-              Wallet: ${fmtUSDC(usdcBalance ?? 0n)} mUSDC
+            <div className="text-xs text-[#9DB5AF] mt-2 flex items-center gap-1.5 pt-2 border-t border-[rgba(246,241,231,0.06)]">
+              <span className="material-symbols-outlined text-[15px] text-[#2BB59A]">account_balance_wallet</span>
+              Wallet: <span className="font-semibold text-[#F6F1E7]">{fmtUSDC(usdcBalance ?? 0n, "")} mUSDC</span>
             </div>
           </motion.div>
 
@@ -115,16 +134,16 @@ export default function DashboardPage() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.05 }}
-            className="bg-[#10231d] border border-white/[0.06] rounded-2xl p-5"
+            className="bg-[#143734] border border-[rgba(246,241,231,0.08)] rounded-2xl p-5"
           >
-            <div className="text-[11px] tracking-widest uppercase text-[#bccabf]">
+            <div className="text-[11px] font-semibold tracking-wider uppercase text-[#9DB5AF]">
               Personal Goals
             </div>
-            <div className="sora text-[26px] font-bold mt-1 text-white">
+            <div className="sora text-2xl sm:text-3xl font-bold mt-1 text-[#F6F1E7]">
               {activeGoals.length}
-              <span className="text-[13px] font-normal text-[#bccabf] ml-1">active</span>
+              <span className="text-xs sm:text-sm font-normal text-[#2BB59A] ml-1.5">active</span>
             </div>
-            <div className="text-[11px] text-[#bccabf] mt-1">
+            <div className="text-xs text-[#9DB5AF] mt-2 pt-2 border-t border-[rgba(246,241,231,0.06)]">
               {goals.length - activeGoals.length} goals matured / withdrawn
             </div>
           </motion.div>
@@ -133,36 +152,37 @@ export default function DashboardPage() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="bg-[#10231d] border border-white/[0.06] rounded-2xl p-5"
+            className="bg-[#143734] border border-[rgba(246,241,231,0.08)] rounded-2xl p-5"
           >
-            <div className="text-[11px] tracking-widest uppercase text-[#bccabf]">
+            <div className="text-[11px] font-semibold tracking-wider uppercase text-[#9DB5AF]">
               Savings Circles
             </div>
-            <div className="sora text-[26px] font-bold mt-1 text-white">
+            <div className="sora text-2xl sm:text-3xl font-bold mt-1 text-[#F6F1E7]">
               {circleAddresses.length}
-              <span className="text-[13px] font-normal text-[#bccabf] ml-1">linked</span>
+              <span className="text-xs sm:text-sm font-normal text-[#2BB59A] ml-1.5">linked</span>
             </div>
-            <div className="text-[11px] text-[#bccabf] mt-1">
+            <div className="text-xs text-[#9DB5AF] mt-2 pt-2 border-t border-[rgba(246,241,231,0.06)]">
               Ajo / ROSCA rotating smart contracts
             </div>
           </motion.div>
         </div>
 
         {/* Goals & Circles Previews */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="bg-[#10231d] border border-white/[0.06] rounded-2xl p-5">
-            <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
-              <span className="sora text-[15px] font-semibold text-white">Active Goals</span>
-              <Link href="/goals" className="text-[12px] text-[#62dd9e] hover:underline flex items-center gap-1">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-[#143734] border border-[rgba(246,241,231,0.08)] rounded-2xl p-5 sm:p-6">
+            <div className="flex items-center justify-between pb-3 border-b border-[rgba(246,241,231,0.08)]">
+              <span className="sora text-[15px] font-semibold text-[#F6F1E7]">Active Goals</span>
+              <Link href="/goals" className="text-xs text-[#2BB59A] hover:underline flex items-center gap-1 font-medium">
                 View all →
               </Link>
             </div>
 
             <div className="mt-4 space-y-3">
               {isGoalsLoading ? (
-                <div className="text-[13px] text-[#bccabf] py-4 text-center">Loading goals...</div>
+                <div className="text-xs text-[#9DB5AF] py-6 text-center">Loading goals from chain...</div>
               ) : activeGoals.length === 0 ? (
-                <div className="text-[13px] text-[#bccabf] py-6 text-center">
+                <div className="text-xs sm:text-sm text-[#9DB5AF] py-8 text-center flex flex-col items-center">
+                  <span className="material-symbols-outlined text-[32px] text-[#9DB5AF]/50 mb-1">savings</span>
                   No active goals yet. Create your first automated vault!
                 </div>
               ) : (
@@ -175,18 +195,18 @@ export default function DashboardPage() {
                     <Link
                       key={goal.id}
                       href={`/goals/${goal.id}`}
-                      className="block p-3 rounded-xl bg-[#01110c] border border-white/[0.04] hover:border-white/[0.12] transition-colors"
+                      className="block p-3.5 rounded-xl bg-[#0E2927] border border-[rgba(246,241,231,0.06)] hover:border-[rgba(43,181,154,0.3)] transition-colors"
                     >
-                      <div className="flex justify-between items-center text-[13px]">
-                        <span className="font-semibold text-white">{goal.name}</span>
-                        <span className="text-[#62dd9e] font-semibold">${fmtUSDC(goal.current)} mUSDC</span>
+                      <div className="flex justify-between items-center text-xs sm:text-sm">
+                        <span className="font-semibold text-[#F6F1E7]">{goal.name}</span>
+                        <span className="text-[#2BB59A] font-semibold">{fmtUSDC(goal.current, "")} mUSDC</span>
                       </div>
-                      <div className="mt-2 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
-                        <div className="h-full bg-[#62dd9e] rounded-full" style={{ width: `${pct}%` }} />
+                      <div className="mt-2.5 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+                        <div className="h-full bg-[#2BB59A] rounded-full transition-all" style={{ width: `${pct}%` }} />
                       </div>
-                      <div className="mt-1.5 flex justify-between text-[11px] text-[#bccabf]">
-                        <span>Target: ${fmtUSDC(goal.target)}</span>
-                        <span>{pct}% reached</span>
+                      <div className="mt-2 flex justify-between text-[11px] text-[#9DB5AF]">
+                        <span>Target: {fmtUSDC(goal.target, "")} mUSDC</span>
+                        <span className="font-semibold text-[#2BB59A]">{pct}% reached</span>
                       </div>
                     </Link>
                   );
@@ -195,19 +215,20 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="bg-[#10231d] border border-white/[0.06] rounded-2xl p-5">
-            <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
-              <span className="sora text-[15px] font-semibold text-white">Your Circles</span>
-              <Link href="/circles" className="text-[12px] text-[#62dd9e] hover:underline flex items-center gap-1">
+          <div className="bg-[#143734] border border-[rgba(246,241,231,0.08)] rounded-2xl p-5 sm:p-6">
+            <div className="flex items-center justify-between pb-3 border-b border-[rgba(246,241,231,0.08)]">
+              <span className="sora text-[15px] font-semibold text-[#F6F1E7]">Your Circles</span>
+              <Link href="/circles" className="text-xs text-[#2BB59A] hover:underline flex items-center gap-1 font-medium">
                 View all →
               </Link>
             </div>
 
             <div className="mt-4 space-y-3">
               {isCirclesLoading ? (
-                <div className="text-[13px] text-[#bccabf] py-4 text-center">Loading circles...</div>
+                <div className="text-xs text-[#9DB5AF] py-6 text-center">Loading circles from chain...</div>
               ) : circleAddresses.length === 0 ? (
-                <div className="text-[13px] text-[#bccabf] py-6 text-center">
+                <div className="text-xs sm:text-sm text-[#9DB5AF] py-8 text-center flex flex-col items-center">
+                  <span className="material-symbols-outlined text-[32px] text-[#9DB5AF]/50 mb-1">groups</span>
                   No circles linked to this address yet.
                 </div>
               ) : (
@@ -215,13 +236,15 @@ export default function DashboardPage() {
                   <Link
                     key={addr}
                     href={`/circles/${addr}`}
-                    className="flex items-center justify-between p-3 rounded-xl bg-[#01110c] border border-white/[0.04] hover:border-white/[0.12] transition-colors"
+                    className="flex items-center justify-between p-3.5 rounded-xl bg-[#0E2927] border border-[rgba(246,241,231,0.06)] hover:border-[rgba(43,181,154,0.3)] transition-colors"
                   >
                     <div>
-                      <div className="text-[13px] font-semibold text-white">Savings Circle</div>
-                      <div className="mono text-[11px] text-[#bccabf]">{addr.slice(0, 10)}...{addr.slice(-8)}</div>
+                      <div className="text-xs sm:text-sm font-semibold text-[#F6F1E7]">Savings Circle</div>
+                      <div className="font-mono text-[11px] text-[#9DB5AF] mt-0.5">
+                        {addr.slice(0, 10)}...{addr.slice(-8)}
+                      </div>
                     </div>
-                    <span className="material-symbols-outlined text-[#62dd9e] text-[18px]">
+                    <span className="material-symbols-outlined text-[#2BB59A] text-[18px]">
                       arrow_forward
                     </span>
                   </Link>

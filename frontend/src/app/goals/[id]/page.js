@@ -1,27 +1,44 @@
 "use client";
+
 import { useEffect, useState } from "react";
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import {
+  useAccount,
+  useReadContract,
+  useWriteContract,
+  useWaitForTransactionReceipt,
+} from "wagmi";
 import { useRouter, useParams } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import { motion, AnimatePresence } from "framer-motion";
-import { ADDRESSES, SAVINGS_VAULT_ABI, MOCK_USDC_ABI, fmtUSDC, parseUSDC } from "@/lib/contracts";
+import {
+  ADDRESSES,
+  SAVINGS_VAULT_ABI,
+  MOCK_USDC_ABI,
+  fmtUSDC,
+  parseUSDC,
+  parseContractError,
+} from "@/lib/contracts";
 
 export default function GoalDetailPage() {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, status } = useAccount();
   const router = useRouter();
   const params = useParams();
-  const goalId = params?.id ? parseInt(params.id, 10) : 0;
+  const goalId = params?.id !== undefined ? parseInt(params.id, 10) : 0;
 
   const [amount, setAmount] = useState("");
   const [earlyOpen, setEarlyOpen] = useState(false);
   const [statusMsg, setStatusMsg] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
 
   const { writeContractAsync, data: txHash, isPending } = useWriteContract();
   const { isLoading: isWaitingTx } = useWaitForTransactionReceipt({ hash: txHash });
 
+  // Redirect only when truly disconnected
   useEffect(() => {
-    if (!isConnected) router.replace("/auth");
-  }, [isConnected, router]);
+    if (status === "disconnected") {
+      router.replace("/auth");
+    }
+  }, [status, router]);
 
   // Read goal from contract
   const { data: goalData, refetch: refetchGoal } = useReadContract({
@@ -29,7 +46,10 @@ export default function GoalDetailPage() {
     abi: SAVINGS_VAULT_ABI,
     functionName: "getGoal",
     args: address !== undefined && !isNaN(goalId) ? [address, BigInt(goalId)] : undefined,
-    query: { enabled: Boolean(address && !isNaN(goalId) && ADDRESSES.savingsVault) },
+    query: {
+      enabled: Boolean(address && !isNaN(goalId) && ADDRESSES.savingsVault),
+      refetchInterval: 10000,
+    },
   });
 
   const { data: isWithdrawable, refetch: refetchWithdrawable } = useReadContract({
@@ -37,7 +57,10 @@ export default function GoalDetailPage() {
     abi: SAVINGS_VAULT_ABI,
     functionName: "isWithdrawable",
     args: address !== undefined && !isNaN(goalId) ? [address, BigInt(goalId)] : undefined,
-    query: { enabled: Boolean(address && !isNaN(goalId) && ADDRESSES.savingsVault) },
+    query: {
+      enabled: Boolean(address && !isNaN(goalId) && ADDRESSES.savingsVault),
+      refetchInterval: 10000,
+    },
   });
 
   const { data: earlyPreview } = useReadContract({
@@ -45,7 +68,10 @@ export default function GoalDetailPage() {
     abi: SAVINGS_VAULT_ABI,
     functionName: "previewEarlyWithdraw",
     args: address !== undefined && !isNaN(goalId) ? [address, BigInt(goalId)] : undefined,
-    query: { enabled: Boolean(address && !isNaN(goalId) && ADDRESSES.savingsVault) },
+    query: {
+      enabled: Boolean(address && !isNaN(goalId) && ADDRESSES.savingsVault),
+      refetchInterval: 10000,
+    },
   });
 
   // Read user mUSDC balance & allowance
@@ -54,7 +80,10 @@ export default function GoalDetailPage() {
     abi: MOCK_USDC_ABI,
     functionName: "balanceOf",
     args: address ? [address] : undefined,
-    query: { enabled: Boolean(address && ADDRESSES.mockUSDC) },
+    query: {
+      enabled: Boolean(address && ADDRESSES.mockUSDC),
+      refetchInterval: 10000,
+    },
   });
 
   const { data: usdcAllowance, refetch: refetchAllowance } = useReadContract({
@@ -62,16 +91,27 @@ export default function GoalDetailPage() {
     abi: MOCK_USDC_ABI,
     functionName: "allowance",
     args: address && ADDRESSES.savingsVault ? [address, ADDRESSES.savingsVault] : undefined,
-    query: { enabled: Boolean(address && ADDRESSES.mockUSDC && ADDRESSES.savingsVault) },
+    query: {
+      enabled: Boolean(address && ADDRESSES.mockUSDC && ADDRESSES.savingsVault),
+      refetchInterval: 10000,
+    },
   });
 
-  if (!isConnected) return null;
+  if (status === "disconnected") return null;
 
   const goalName = goalData?.name || `Vault #${goalId}`;
   const savedUnits = goalData?.saved || 0n;
   const targetUnits = goalData?.target || 0n;
   const isWithdrawn = goalData?.withdrawn || false;
-  const deadlineDate = goalData?.deadline ? new Date(Number(goalData.deadline) * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "N/A";
+  const deadlineDate = goalData?.deadline
+    ? new Date(Number(goalData.deadline) * 1000).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "N/A";
 
   const targetNum = Number(targetUnits);
   const savedNum = Number(savedUnits);
@@ -80,22 +120,23 @@ export default function GoalDetailPage() {
 
   const handleDeposit = async () => {
     setStatusMsg("");
+    setErrorMsg("");
     const parsedAmt = parseUSDC(amount);
     if (parsedAmt <= 0n) {
-      setStatusMsg("Please enter an amount greater than zero.");
+      setErrorMsg("Please enter an amount greater than zero.");
       return;
     }
 
     try {
-      // Step 1: Check allowance
+      // Step 1: Check allowance — approve max if insufficient
       const currentAllowance = usdcAllowance || 0n;
       if (currentAllowance < parsedAmt) {
-        setStatusMsg("Step 1/2: Approving mUSDC transfer...");
-        await writeContractAsync({
+        setStatusMsg("Step 1/2: Approving mUSDC transfer in wallet...");
+        const approveHash = await writeContractAsync({
           address: ADDRESSES.mockUSDC,
           abi: MOCK_USDC_ABI,
           functionName: "approve",
-          args: [ADDRESSES.savingsVault, parsedAmt],
+          args: [ADDRESSES.savingsVault, 2n ** 256n - 1n],
         });
         await refetchAllowance();
       }
@@ -109,38 +150,43 @@ export default function GoalDetailPage() {
         args: [BigInt(goalId), parsedAmt],
       });
 
-      setStatusMsg("Deposit successful!");
+      setStatusMsg("Deposit successful! Vault balance updated.");
       setAmount("");
       refetchGoal();
       refetchBalance();
       refetchWithdrawable();
     } catch (err) {
-      setStatusMsg(err.shortMessage || err.message || "Transaction failed.");
+      setStatusMsg("");
+      setErrorMsg(parseContractError(err));
     }
   };
 
   const handleWithdraw = async () => {
     setStatusMsg("");
+    setErrorMsg("");
     try {
-      setStatusMsg("Withdrawing funds...");
+      setStatusMsg("Withdrawing funds with 0% fee...");
       await writeContractAsync({
         address: ADDRESSES.savingsVault,
         abi: SAVINGS_VAULT_ABI,
         functionName: "withdraw",
         args: [BigInt(goalId)],
       });
-      setStatusMsg("Withdrawal complete!");
+      setStatusMsg("Standard withdrawal completed successfully! Funds returned to wallet.");
       refetchGoal();
       refetchBalance();
+      refetchWithdrawable();
     } catch (err) {
-      setStatusMsg(err.shortMessage || err.message || "Withdrawal failed.");
+      setStatusMsg("");
+      setErrorMsg(parseContractError(err));
     }
   };
 
   const handleEarlyWithdraw = async () => {
     setStatusMsg("");
+    setErrorMsg("");
     try {
-      setStatusMsg("Executing early withdrawal (10% penalty)...");
+      setStatusMsg("Executing early withdrawal (10% penalty to treasury)...");
       await writeContractAsync({
         address: ADDRESSES.savingsVault,
         abi: SAVINGS_VAULT_ABI,
@@ -148,127 +194,175 @@ export default function GoalDetailPage() {
         args: [BigInt(goalId)],
       });
       setEarlyOpen(false);
-      setStatusMsg("Early withdrawal processed.");
+      setStatusMsg("Early withdrawal processed successfully. Payout delivered.");
       refetchGoal();
       refetchBalance();
+      refetchWithdrawable();
     } catch (err) {
-      setStatusMsg(err.shortMessage || err.message || "Early withdrawal failed.");
+      setStatusMsg("");
+      setErrorMsg(parseContractError(err));
     }
   };
 
   const isBusy = isPending || isWaitingTx;
 
   return (
-    <div className="min-h-screen bg-[#041711] flex flex-col lg:flex-row">
+    <div className="min-h-screen bg-[#0E2927] text-[#F6F1E7]">
       <Sidebar />
-      <main className="flex-1 lg:ml-[240px] w-full min-w-0 p-4 lg:p-8 max-w-[800px]">
+      <main className="lg:pl-[240px] px-4 sm:px-6 lg:px-8 py-8 max-w-4xl mx-auto space-y-6">
         <button
           onClick={() => router.back()}
-          className="text-[13px] text-[#bccabf] hover:text-white flex items-center gap-1"
+          className="text-xs sm:text-sm text-[#9DB5AF] hover:text-[#F6F1E7] flex items-center gap-1 transition-colors"
         >
-          <span className="material-symbols-outlined text-[18px]">
-            arrow_back
-          </span>{" "}
-          Goals
+          <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+          Back to Goals
         </button>
 
         {statusMsg && (
-          <div className="mt-3 p-3 rounded-xl bg-[#10231d] border border-white/[0.08] text-[13px] text-[#62dd9e]">
-            {statusMsg}
+          <div className="p-3.5 rounded-xl bg-[rgba(43,181,154,0.15)] border border-[rgba(43,181,154,0.3)] text-[#2BB59A] text-xs sm:text-sm flex items-center gap-2">
+            <span className="material-symbols-outlined text-[18px]">check_circle</span>
+            <span>{statusMsg}</span>
           </div>
         )}
 
+        {errorMsg && (
+          <div className="p-3.5 rounded-xl bg-[rgba(235,87,87,0.12)] border border-[rgba(235,87,87,0.3)] text-[#EB5757] text-xs sm:text-sm flex items-start gap-2">
+            <span className="material-symbols-outlined text-[18px] shrink-0">error</span>
+            <span>{errorMsg}</span>
+          </div>
+        )}
+
+        {/* Goal Overview Card */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35 }}
-          className="mt-4 bg-[#10231d] border border-white/[0.06] rounded-2xl p-6"
+          className="bg-[#143734] border border-[rgba(246,241,231,0.08)] rounded-2xl p-6 sm:p-8"
         >
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
             <div>
-              <div className="sora text-[20px] font-semibold">{goalName}</div>
-              <div className="text-[12px] text-[#bccabf] mt-1">
-                Target {fmtUSDC(targetUnits, "$")} · Maturity {deadlineDate} · {pct}%
+              <h1 className="sora text-2xl sm:text-3xl font-bold text-[#F6F1E7]">
+                {goalName}
+              </h1>
+              <div className="text-xs sm:text-sm text-[#9DB5AF] mt-1.5 flex flex-wrap items-center gap-2">
+                <span>Target: <strong className="text-[#F6F1E7]">{fmtUSDC(targetUnits, "")} mUSDC</strong></span>
+                <span>•</span>
+                <span>Maturity: <strong className="text-[#F6F1E7]">{deadlineDate}</strong></span>
               </div>
             </div>
-            <span className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-semibold tracking-widest uppercase ${
-              isWithdrawn ? "bg-white/10 text-[#bccabf]" : isWithdrawable ? "bg-[#e4c279]/20 text-[#e4c279]" : "bg-[#62dd9e]/15 text-[#62dd9e]"
-            }`}>
-              {isWithdrawn ? "Withdrawn" : isWithdrawable ? "Eligible" : "Active"}
+            <span
+              className={`shrink-0 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                isWithdrawn
+                  ? "bg-white/10 text-[#9DB5AF]"
+                  : isWithdrawable
+                  ? "bg-[rgba(227,176,75,0.15)] text-[#E3B04B] border border-[rgba(227,176,75,0.3)]"
+                  : "bg-[rgba(43,181,154,0.15)] text-[#2BB59A] border border-[rgba(43,181,154,0.25)]"
+              }`}
+            >
+              {isWithdrawn ? "Withdrawn" : isWithdrawable ? "Eligible for 0% Withdraw" : "Active Saving"}
             </span>
           </div>
-          <div className="mt-4 h-2 rounded-full bg-[#01110c] overflow-hidden">
-            <div
-              className="h-full bg-[#62dd9e] rounded-full transition-all duration-500"
-              style={{ width: `${pct}%` }}
-            />
-          </div>
-          <div className="mt-2 flex justify-between text-[11px] text-[#bccabf]">
-            <span>{fmtUSDC(savedUnits, "$")} saved</span>
-            <span>{fmtUSDC(remainingUnits, "$")} remaining</span>
+
+          {/* Progress Bar */}
+          <div className="mt-6">
+            <div className="flex items-center justify-between text-xs sm:text-sm text-[#9DB5AF] mb-2">
+              <span>Savings Progress</span>
+              <span className="sora font-bold text-[#2BB59A]">{pct}%</span>
+            </div>
+            <div className="h-2.5 rounded-full bg-[#0E2927] overflow-hidden">
+              <div
+                className="h-full bg-[#2BB59A] rounded-full transition-all duration-500"
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            <div className="mt-2.5 flex justify-between text-xs text-[#9DB5AF]">
+              <span>Saved: <strong className="text-[#F6F1E7]">{fmtUSDC(savedUnits, "")} mUSDC</strong></span>
+              <span>Remaining: <strong className="text-[#F6F1E7]">{fmtUSDC(remainingUnits, "")} mUSDC</strong></span>
+            </div>
           </div>
         </motion.div>
 
         {!isWithdrawn ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {/* Deposit Box */}
-            <div className="bg-[#10231d] border border-white/[0.06] rounded-2xl p-5">
-              <div className="text-[11px] font-semibold tracking-widest uppercase text-[#bccabf]">
-                Contribute
+            <div className="bg-[#143734] border border-[rgba(246,241,231,0.08)] rounded-2xl p-5 sm:p-6 flex flex-col justify-between">
+              <div>
+                <div className="text-[11px] font-semibold tracking-wider uppercase text-[#9DB5AF]">
+                  Deposit mUSDC
+                </div>
+                <p className="text-xs text-[#9DB5AF] mt-1">
+                  Add funds towards your goal target.
+                </p>
+                <div className="mt-4 flex gap-2">
+                  <input
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    type="number"
+                    placeholder="Amount (mUSDC)"
+                    disabled={isBusy}
+                    className="flex-1 h-11 px-3.5 rounded-xl bg-[#0E2927] border border-[rgba(246,241,231,0.08)] text-sm text-[#F6F1E7] placeholder:text-[#9DB5AF]/40 focus:outline-none focus:border-[#2BB59A]"
+                  />
+                  <button
+                    onClick={handleDeposit}
+                    disabled={isBusy || !amount}
+                    className="px-5 h-11 bg-[#2BB59A] hover:bg-[#259e87] disabled:opacity-50 text-[#0E2927] rounded-xl text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
+                  >
+                    {isBusy ? "Processing..." : "Deposit"}
+                  </button>
+                </div>
               </div>
-              <div className="mt-3 flex gap-2">
-                <input
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  type="number"
-                  placeholder="mUSDC"
-                  disabled={isBusy}
-                  className="flex-1 h-11 px-3 rounded-xl bg-[#01110c] border border-white/[0.08] text-[14px] placeholder:text-[#bccabf]/50 focus:outline-none focus:border-[#62dd9e]/50"
-                />
-                <button
-                  onClick={handleDeposit}
-                  disabled={isBusy || !amount}
-                  className="px-5 h-11 bg-[#1aa56c] hover:bg-[#62dd9e] disabled:opacity-50 text-white hover:text-[#002111] rounded-xl text-[12px] font-semibold transition-colors"
-                >
-                  Deposit
-                </button>
-              </div>
-              <div className="text-[11px] text-[#bccabf]/60 mt-2">
-                Balance: {fmtUSDC(usdcBalance, "$")} mUSDC
+              <div className="text-xs text-[#9DB5AF] mt-3 pt-3 border-t border-[rgba(246,241,231,0.06)] flex items-center justify-between">
+                <span>Wallet Balance:</span>
+                <span className="font-semibold text-[#F6F1E7]">
+                  {fmtUSDC(usdcBalance, "")} mUSDC
+                </span>
               </div>
             </div>
 
             {/* Withdraw Box */}
-            <div className="bg-[#10231d] border border-white/[0.06] rounded-2xl p-5">
-              <div className="text-[11px] font-semibold tracking-widest uppercase text-[#bccabf]">
-                Withdraw
+            <div className="bg-[#143734] border border-[rgba(246,241,231,0.08)] rounded-2xl p-5 sm:p-6 flex flex-col justify-between">
+              <div>
+                <div className="text-[11px] font-semibold tracking-wider uppercase text-[#9DB5AF]">
+                  Withdrawal Options
+                </div>
+                <p className="text-xs text-[#9DB5AF] mt-1">
+                  Withdraw 100% with 0% fee on maturity, or exit early with a 10% penalty.
+                </p>
+                <div className="mt-4 flex flex-col sm:flex-row gap-2.5">
+                  <button
+                    onClick={handleWithdraw}
+                    disabled={isBusy || !isWithdrawable || savedUnits === 0n}
+                    className="flex-1 h-11 bg-[#2BB59A] hover:bg-[#259e87] disabled:opacity-30 disabled:cursor-not-allowed text-[#0E2927] rounded-xl text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">check</span>
+                    Withdraw (0% fee)
+                  </button>
+                  <button
+                    onClick={() => setEarlyOpen(true)}
+                    disabled={isBusy || isWithdrawable || savedUnits === 0n}
+                    className="flex-1 h-11 bg-[rgba(227,176,75,0.12)] border border-[rgba(227,176,75,0.3)] text-[#E3B04B] hover:bg-[rgba(227,176,75,0.2)] disabled:opacity-30 disabled:cursor-not-allowed rounded-xl text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">warning</span>
+                    Early Exit (10% fee)
+                  </button>
+                </div>
               </div>
-              <div className="mt-3 flex gap-2">
-                <button
-                  onClick={handleWithdraw}
-                  disabled={isBusy || !isWithdrawable || savedUnits === 0n}
-                  className="flex-1 h-11 bg-[#1aa56c] hover:bg-[#62dd9e] disabled:opacity-30 disabled:cursor-not-allowed text-white hover:text-[#002111] rounded-xl text-[12px] font-semibold transition-colors"
-                >
-                  Withdraw (0% fee)
-                </button>
-                <button
-                  onClick={() => setEarlyOpen(true)}
-                  disabled={isBusy || isWithdrawable || savedUnits === 0n}
-                  className="flex-1 h-11 bg-[#4a1a0a]/40 border border-[#e4c279]/20 text-[#e4c279] hover:bg-[#4a1a0a]/60 disabled:opacity-30 disabled:cursor-not-allowed rounded-xl text-[12px] font-semibold transition-colors"
-                >
-                  Early · 10% fee
-                </button>
-              </div>
-              <div className="text-[11px] text-[#bccabf]/60 mt-2">
+              <div className="text-xs text-[#9DB5AF] mt-3 pt-3 border-t border-[rgba(246,241,231,0.06)]">
                 {isWithdrawable
-                  ? "Target or maturity reached: Free withdrawal unlocked."
-                  : "Withdrawal unlocked once target or date is hit."}
+                  ? "✓ Target or maturity reached: Free 0% withdrawal unlocked!"
+                  : "Target or deadline not reached yet. Early withdrawal applies 10% penalty."}
               </div>
             </div>
           </div>
         ) : (
-          <div className="mt-4 p-5 rounded-2xl bg-[#10231d] border border-white/[0.06] text-center text-[#bccabf] text-[13px]">
-            This savings goal has been completed and withdrawn.
+          <div className="p-6 rounded-2xl bg-[#143734] border border-[rgba(246,241,231,0.08)] text-center text-[#9DB5AF] text-sm">
+            <span className="material-symbols-outlined text-[32px] text-[#2BB59A] mb-1">
+              task_alt
+            </span>
+            <p className="font-semibold text-[#F6F1E7]">Vault Completed</p>
+            <p className="text-xs text-[#9DB5AF] mt-0.5">
+              This savings goal has been completed and fully withdrawn to your wallet.
+            </p>
           </div>
         )}
 
@@ -279,47 +373,56 @@ export default function GoalDetailPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+              className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4"
             >
               <motion.div
                 initial={{ scale: 0.95 }}
                 animate={{ scale: 1 }}
                 exit={{ scale: 0.95 }}
-                className="bg-[#10231d] border border-white/[0.1] rounded-2xl p-6 max-w-[420px] w-full"
+                className="bg-[#143734] border border-[rgba(246,241,231,0.12)] rounded-2xl p-6 sm:p-7 max-w-md w-full shadow-2xl"
               >
-                <h3 className="sora text-[17px] font-semibold text-[#e4c279]">
-                  Confirm early withdrawal
-                </h3>
-                <p className="text-[13px] text-[#bccabf] mt-2 leading-relaxed">
-                  Withdrawing before your deadline incurs a strict <strong>10% protocol penalty</strong> that is sent to the community rewards pool.
+                <div className="flex items-center gap-2 text-[#E3B04B] mb-2">
+                  <span className="material-symbols-outlined text-[24px]">warning</span>
+                  <h3 className="sora text-lg font-bold">
+                    Confirm Early Exit
+                  </h3>
+                </div>
+                <p className="text-xs sm:text-sm text-[#9DB5AF] leading-relaxed">
+                  Withdrawing before your deadline or target incurs a strict <strong>10% protocol penalty</strong> that is sent directly to the CowrieChain treasury address.
                 </p>
-                <div className="mt-4 p-3 rounded-xl bg-[#01110c] text-[12px] space-y-1">
-                  <div className="flex justify-between text-[#bccabf]">
-                    <span>Current balance:</span>
-                    <span>{fmtUSDC(savedUnits, "$")}</span>
+
+                <div className="mt-4 p-4 rounded-xl bg-[#0E2927] border border-[rgba(246,241,231,0.06)] text-xs space-y-2">
+                  <div className="flex justify-between text-[#9DB5AF]">
+                    <span>Current Saved Balance:</span>
+                    <span className="font-semibold text-[#F6F1E7]">{fmtUSDC(savedUnits, "")} mUSDC</span>
                   </div>
-                  <div className="flex justify-between text-red-400">
-                    <span>10% Penalty:</span>
-                    <span>{earlyPreview ? fmtUSDC(earlyPreview[1], "$") : "10%"}</span>
+                  <div className="flex justify-between text-[#EB5757]">
+                    <span>10% Treasury Penalty:</span>
+                    <span className="font-semibold">
+                      -{earlyPreview ? fmtUSDC(earlyPreview[1], "") : fmtUSDC(savedUnits / 10n, "")} mUSDC
+                    </span>
                   </div>
-                  <div className="flex justify-between text-[#62dd9e] font-semibold pt-1 border-t border-white/[0.06]">
-                    <span>Net payout:</span>
-                    <span>{earlyPreview ? fmtUSDC(earlyPreview[0], "$") : fmtUSDC((savedUnits * 9n) / 10n, "$")}</span>
+                  <div className="flex justify-between text-[#2BB59A] font-bold pt-2 border-t border-[rgba(246,241,231,0.08)] text-sm">
+                    <span>Net Payout to Wallet:</span>
+                    <span>
+                      {earlyPreview ? fmtUSDC(earlyPreview[0], "") : fmtUSDC((savedUnits * 9n) / 10n, "")} mUSDC
+                    </span>
                   </div>
                 </div>
-                <div className="mt-5 flex gap-2">
+
+                <div className="mt-6 flex gap-3">
                   <button
                     onClick={() => setEarlyOpen(false)}
-                    className="flex-1 py-2.5 bg-white/[0.08] hover:bg-white/[0.12] rounded-xl text-[12px] font-semibold"
+                    className="flex-1 py-2.5 bg-white/[0.06] hover:bg-white/[0.12] rounded-xl text-xs sm:text-sm font-semibold text-[#F6F1E7] transition-colors"
                   >
-                    Keep saving
+                    Keep Saving
                   </button>
                   <button
                     onClick={handleEarlyWithdraw}
                     disabled={isBusy}
-                    className="flex-1 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl text-[12px] font-semibold"
+                    className="flex-1 py-2.5 bg-[#EB5757] hover:bg-[#d64545] disabled:opacity-50 text-white rounded-xl text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
                   >
-                    {isBusy ? "Processing..." : "Confirm exit"}
+                    {isBusy ? "Processing..." : "Confirm Early Exit"}
                   </button>
                 </div>
               </motion.div>

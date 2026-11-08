@@ -53,6 +53,10 @@ contract DeployScript is Script {
         GroupSaveFactory factory = new GroupSaveFactory(address(mockUSDC));
         console.log("3. GroupSaveFactory: ", address(factory));
 
+        // 4. Mint initial test tokens to deployer
+        mockUSDC.mint(deployer, 100_000 * 1e6);
+        console.log("Minted 100,000 mUSDC to deployer: ", deployer);
+
         vm.stopBroadcast();
 
         console.log("==================================================");
