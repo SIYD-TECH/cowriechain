@@ -36,6 +36,8 @@ const item = {
 };
 
 function CircleCard({ address }) {
+  const { address: userAddress } = useAccount();
+
   const { data: info, isLoading } = useReadContract({
     address,
     abi: GROUP_SAVE_ABI,
@@ -46,31 +48,77 @@ function CircleCard({ address }) {
     },
   });
 
+  const { data: memberInfo } = useReadContract({
+    address,
+    abi: GROUP_SAVE_ABI,
+    functionName: "getMemberInfo",
+    args: userAddress ? [userAddress] : undefined,
+    query: {
+      enabled: !!address && !!userAddress,
+      refetchInterval: 10000,
+    },
+  });
+
   const name = info?.name || "Savings Circle";
   const status = info?.status !== undefined ? Number(info.status) : 0;
   const contribution = info?.contribution ?? 0n;
   const memberCount = info?.memberCount ? Number(info.memberCount) : 0;
   const joined = info?.joined ? Number(info.joined) : 0;
   const currentRound = info?.currentRound !== undefined ? Number(info.currentRound) : 0;
+  const creator = info?.creator;
+
+  const isCreator = userAddress && creator && userAddress.toLowerCase() === creator.toLowerCase();
+  const isMember = !!memberInfo?.isMember;
+  const isInvited = !!memberInfo?.invited;
+  const needsAction = isInvited && !isMember && status === 0;
 
   return (
     <motion.div
       variants={item}
       whileHover={{ y: -3 }}
-      className="bg-[#143734] border border-[rgba(246,241,231,0.08)] hover:border-[rgba(43,181,154,0.3)] rounded-2xl p-5 flex flex-col justify-between transition-colors shadow-sm"
+      className={`rounded-2xl p-5 flex flex-col justify-between transition-all shadow-sm ${
+        needsAction
+          ? "bg-gradient-to-b from-[#193f3a] to-[#143734] border-2 border-amber-400/60 shadow-[0_0_24px_rgba(245,158,11,0.18)]"
+          : "bg-[#143734] border border-[rgba(246,241,231,0.08)] hover:border-[rgba(43,181,154,0.3)]"
+      }`}
     >
       <div>
+        {/* Invitee Action Required Header Banner */}
+        {needsAction && (
+          <div className="mb-3 px-2.5 py-1.5 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-between gap-2">
+            <span className="text-[11px] font-bold text-amber-300 flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[15px]">mark_email_unread</span>
+              You are invited!
+            </span>
+            <span className="text-[9px] uppercase tracking-wider font-extrabold text-amber-900 bg-amber-300 px-2 py-0.5 rounded-full">
+              Action Needed
+            </span>
+          </div>
+        )}
+
         <div className="flex items-center justify-between gap-2">
           <span className="sora text-[15px] font-semibold text-[#F6F1E7] truncate">
             {isLoading ? "Loading..." : name}
           </span>
-          <span
-            className={`px-2 py-0.5 rounded-full border text-[10px] font-bold tracking-wider uppercase shrink-0 ${
-              STATUS_COLORS[status] || ""
-            }`}
-          >
-            {STATUS_NAMES[status] || "Unknown"}
-          </span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {isCreator && (
+              <span className="px-2 py-0.5 rounded-full bg-[#E3B04B]/15 text-[#E3B04B] border border-[#E3B04B]/30 text-[10px] font-bold uppercase tracking-wider">
+                Creator
+              </span>
+            )}
+            {isMember && (
+              <span className="px-2 py-0.5 rounded-full bg-[#2BB59A]/15 text-[#2BB59A] border border-[#2BB59A]/30 text-[10px] font-bold uppercase tracking-wider">
+                Member
+              </span>
+            )}
+            <span
+              className={`px-2 py-0.5 rounded-full border text-[10px] font-bold tracking-wider uppercase ${
+                STATUS_COLORS[status] || ""
+              }`}
+            >
+              {STATUS_NAMES[status] || "Unknown"}
+            </span>
+          </div>
         </div>
 
         <div className="text-[11px] text-[#9DB5AF] mt-1 font-mono">
@@ -103,9 +151,20 @@ function CircleCard({ address }) {
 
       <Link
         href={`/circles/${address}`}
-        className="mt-5 w-full text-center py-2.5 bg-[#0E2927] hover:bg-[#1a3f3a] border border-[rgba(246,241,231,0.06)] hover:border-[rgba(43,181,154,0.3)] text-[#F6F1E7] rounded-xl text-xs font-semibold tracking-wider uppercase transition-colors"
+        className={`mt-5 w-full text-center py-2.5 rounded-xl text-xs font-semibold tracking-wider uppercase transition-all flex items-center justify-center gap-1.5 ${
+          needsAction
+            ? "bg-[#2BB59A] hover:bg-[#259e87] text-[#0E2927] font-bold shadow-[0_2px_12px_rgba(43,181,154,0.35)]"
+            : "bg-[#0E2927] hover:bg-[#1a3f3a] border border-[rgba(246,241,231,0.06)] hover:border-[rgba(43,181,154,0.3)] text-[#F6F1E7]"
+        }`}
       >
-        View Circle
+        {needsAction ? (
+          <>
+            <span className="material-symbols-outlined text-[16px]">how_to_reg</span>
+            Accept Invite & Join
+          </>
+        ) : (
+          "View Circle"
+        )}
       </Link>
     </motion.div>
   );

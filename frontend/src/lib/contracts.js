@@ -80,18 +80,34 @@ export function parseContractError(err) {
   if (!err) return "An unexpected error occurred.";
 
   const msg = err.shortMessage || err.message || String(err);
+  const msgLower = msg.toLowerCase();
 
   if (
-    msg.includes("User rejected") ||
-    msg.includes("UserRejectedRequestError") ||
+    msgLower.includes("user rejected") ||
+    msgLower.includes("userrejectedrequesterror") ||
     err.name === "UserRejectedRequestError"
   ) {
     return "Transaction was cancelled in your wallet.";
   }
 
+  // Exact 4-byte ERC20 error selectors and human-readable names
+  if (
+    msgLower.includes("0xfb8f41b2") ||
+    msgLower.includes("erc20insufficientallowance")
+  ) {
+    return "Token allowance insufficient (0xfb8f41b2). Please ensure the token approval transaction has confirmed on Sepolia before submitting the join or contribution transaction.";
+  }
+
+  if (
+    msgLower.includes("0xf4d678b8") ||
+    msgLower.includes("erc20insufficientbalance")
+  ) {
+    return "Insufficient mUSDC balance in your wallet (0xf4d678b8). Please claim free test tokens from the Faucet first!";
+  }
+
   const errorMap = {
     FaucetCooldown: "Faucet cooldown is active: you can claim 1,000 mUSDC once every 12 hours. Please check the countdown timer.",
-    NotInvited: "You have not been invited to join this circle yet. The circle creator must add your wallet address.",
+    NotInvited: "You have not been invited to join this circle yet. The circle creator must whitelist your wallet address first.",
     JoinClosed: "The joining deadline for this circle has already passed.",
     Full: "This circle is already full (maximum member count reached).",
     AlreadyMember: "Your wallet is already a member of this circle.",
@@ -114,12 +130,10 @@ export function parseContractError(err) {
     UseNormalWithdraw: "This goal has already matured or reached its target! Use standard withdrawal with 0% penalty instead of early withdrawal.",
     NoSuchGoal: "The requested savings goal was not found.",
     ZeroAmount: "Amount must be greater than zero.",
-    ERC20InsufficientAllowance: "Token allowance insufficient. Please approve CowrieChain to spend your mUSDC.",
-    ERC20InsufficientBalance: "Insufficient mUSDC balance in your wallet. Claim free test tokens from the Faucet!",
   };
 
   for (const [key, text] of Object.entries(errorMap)) {
-    if (msg.includes(key)) {
+    if (msgLower.includes(key.toLowerCase())) {
       return text;
     }
   }

@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   useAccount,
   useReadContract,
   useWriteContract,
   useWaitForTransactionReceipt,
+  usePublicClient,
 } from "wagmi";
 import { useRouter, useParams } from "next/navigation";
+import Link from "next/link";
 import Sidebar from "@/components/Sidebar";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -31,11 +33,13 @@ export default function CircleDetailPage() {
   const router = useRouter();
   const params = useParams();
   const circleAddress = params?.id;
+  const publicClient = usePublicClient();
 
   const [feedbackMsg, setFeedbackMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [inviteAddresses, setInviteAddresses] = useState("");
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [invitedAddresses, setInvitedAddresses] = useState([]);
 
   // Wagmi connection guard
   useEffect(() => {
@@ -70,7 +74,7 @@ export default function CircleDetailPage() {
     },
   });
 
-  // Read Members list
+  // Read Members list (confirmed joined members)
   const {
     data: members,
     refetch: refetchMembers,
@@ -171,6 +175,84 @@ export default function CircleDetailPage() {
     hash: txHash,
   });
 
+  // Load cached invited addresses for this circle
+  useEffect(() => {
+    if (!circleAddress) return;
+    try {
+      const stored = localStorage.getItem(`cowrie_invited_${circleAddress.toLowerCase()}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          setInvitedAddresses(parsed);
+        }
+      }
+    } catch {}
+  }, [circleAddress]);
+
+  // Query on-chain events via publicClient to discover whitelisted peers
+  useEffect(() => {
+    let active = true;
+    const fetchInvitedLogs = async () => {
+      if (!publicClient || !circleAddress) return;
+      try {
+        const block = await publicClient.getBlockNumber();
+        const fromBlock = block > 20000n ? block - 20000n : 0n;
+
+        const [invLogs, uninvLogs] = await Promise.all([
+          publicClient
+            .getLogs({
+              address: circleAddress,
+              event: {
+                type: "event",
+                name: "Invited",
+                inputs: [{ type: "address", name: "user", indexed: true }],
+              },
+              fromBlock,
+              toBlock: "latest",
+            })
+            .catch(() => []),
+          publicClient
+            .getLogs({
+              address: circleAddress,
+              event: {
+                type: "event",
+                name: "Uninvited",
+                inputs: [{ type: "address", name: "user", indexed: true }],
+              },
+              fromBlock,
+              toBlock: "latest",
+            })
+            .catch(() => []),
+        ]);
+
+        if (!active) return;
+
+        const uninvitedSet = new Set(uninvLogs.map((l) => l.args.user?.toLowerCase()));
+        const onChainInvited = invLogs
+          .map((l) => l.args.user)
+          .filter((u) => u && !uninvitedSet.has(u.toLowerCase()));
+
+        setInvitedAddresses((prev) => {
+          const combined = Array.from(new Set([...prev, ...onChainInvited]));
+          try {
+            localStorage.setItem(
+              `cowrie_invited_${circleAddress.toLowerCase()}`,
+              JSON.stringify(combined)
+            );
+          } catch {}
+          return combined;
+        });
+      } catch (err) {
+        // Fall back gracefully to local storage
+      }
+    };
+
+    fetchInvitedLogs();
+    return () => {
+      active = false;
+    };
+  }, [publicClient, circleAddress]);
+
   useEffect(() => {
     if (isTxSuccess) {
       setFeedbackMsg("Transaction confirmed successfully on Sepolia!");
@@ -234,33 +316,59 @@ export default function CircleDetailPage() {
 
   const isBusy = isWritePending || isTxConfirming;
 
-  // Ensure maximum token allowance helper
+  // Ensure maximum token allowance helper (waits for transaction confirmation on Sepolia)
   const ensureAllowance = async (requiredAmount) => {
     const currentAllowance = allowance ?? 0n;
     if (currentAllowance < requiredAmount) {
-      setFeedbackMsg("Step 1/2: Approving token allowance in your wallet...");
-      await writeContractAsync({
+      setFeedbackMsg("Step 1/2: Please approve token spending in your wallet (e.g. MetaMask)...");
+      const approveHash = await writeContractAsync({
         address: circleInfo?.token || ADDRESSES.mockUSDC,
         abi: MOCK_USDC_ABI,
         functionName: "approve",
         args: [circleAddress, 2n ** 256n - 1n], // approve max as per guide
       });
+      setFeedbackMsg("Step 1/2: Waiting for token approval confirmation on Sepolia...");
+      if (publicClient) {
+        await publicClient.waitForTransactionReceipt({ hash: approveHash });
+      }
       await refetchAllowance();
     }
   };
 
-  // 1. Join Circle
+  // 1. Join Circle & Deposit Stake
   const handleJoin = async () => {
     setErrorMsg("");
     setFeedbackMsg("");
+
+    const requiredAmount = contribution;
+    const userBal = userBalance ?? 0n;
+    if (userBal < requiredAmount) {
+      setErrorMsg(
+        `Insufficient mUSDC balance. You have ${fmtUSDC(userBal)} mUSDC, but ${fmtUSDC(requiredAmount)} mUSDC is required to deposit your join stake. Please claim free test tokens from the Faucet first.`
+      );
+      return;
+    }
+
     try {
-      await ensureAllowance(contribution);
-      setFeedbackMsg("Step 2/2: Joining circle and depositing stake...");
-      await writeContractAsync({
+      await ensureAllowance(requiredAmount);
+      setFeedbackMsg("Step 2/2: Confirming join & staking in your wallet...");
+      const joinHash = await writeContractAsync({
         address: circleAddress,
         abi: GROUP_SAVE_ABI,
         functionName: "join",
       });
+      setFeedbackMsg("Step 2/2: Waiting for join confirmation on Sepolia...");
+      if (publicClient) {
+        await publicClient.waitForTransactionReceipt({ hash: joinHash });
+      }
+      setFeedbackMsg("🎉 Successfully joined circle! Your join stake has been locked.");
+      refetchInfo();
+      refetchMembers();
+      refetchPayoutOrder();
+      refetchMemberInfo();
+      refetchCanResolve();
+      refetchAllowance();
+      refetchBalance();
     } catch (err) {
       setFeedbackMsg("");
       setErrorMsg(parseContractError(err));
@@ -273,13 +381,30 @@ export default function CircleDetailPage() {
     setFeedbackMsg("");
     try {
       const due = amountDue > 0n ? amountDue : contribution;
+      const userBal = userBalance ?? 0n;
+      if (userBal < due) {
+        setErrorMsg(
+          `Insufficient mUSDC balance. You have ${fmtUSDC(userBal)} mUSDC, but ${fmtUSDC(due)} mUSDC is due for this round. Please claim free tokens from the Faucet.`
+        );
+        return;
+      }
+
       await ensureAllowance(due);
-      setFeedbackMsg("Step 2/2: Paying round contribution...");
-      await writeContractAsync({
+      setFeedbackMsg("Step 2/2: Confirming round contribution in your wallet...");
+      const contribHash = await writeContractAsync({
         address: circleAddress,
         abi: GROUP_SAVE_ABI,
         functionName: "contribute",
       });
+      setFeedbackMsg("Step 2/2: Waiting for contribution confirmation on Sepolia...");
+      if (publicClient) {
+        await publicClient.waitForTransactionReceipt({ hash: contribHash });
+      }
+      setFeedbackMsg(`Contribution confirmed for Round ${currentRound + 1}!`);
+      refetchInfo();
+      refetchMembers();
+      refetchMemberInfo();
+      refetchBalance();
     } catch (err) {
       setFeedbackMsg("");
       setErrorMsg(parseContractError(err));
@@ -296,11 +421,19 @@ export default function CircleDetailPage() {
         return;
       }
       setFeedbackMsg("Submitting payout claim to your wallet...");
-      await writeContractAsync({
+      const claimHash = await writeContractAsync({
         address: circleAddress,
         abi: GROUP_SAVE_ABI,
         functionName: "claim",
       });
+      setFeedbackMsg("Waiting for claim confirmation on Sepolia...");
+      if (publicClient) {
+        await publicClient.waitForTransactionReceipt({ hash: claimHash });
+      }
+      setFeedbackMsg("🎉 Payout successfully claimed to your wallet!");
+      refetchInfo();
+      refetchMemberInfo();
+      refetchBalance();
     } catch (err) {
       setFeedbackMsg("");
       setErrorMsg(parseContractError(err));
@@ -313,11 +446,19 @@ export default function CircleDetailPage() {
     setFeedbackMsg("");
     try {
       setFeedbackMsg("Resolving unpaid members using stake/collateral hold-back...");
-      await writeContractAsync({
+      const resHash = await writeContractAsync({
         address: circleAddress,
         abi: GROUP_SAVE_ABI,
         functionName: "resolveRound",
       });
+      if (publicClient) {
+        await publicClient.waitForTransactionReceipt({ hash: resHash });
+      }
+      setFeedbackMsg("Round resolved successfully!");
+      refetchInfo();
+      refetchMembers();
+      refetchMemberInfo();
+      refetchCanResolve();
     } catch (err) {
       setFeedbackMsg("");
       setErrorMsg(parseContractError(err));
@@ -330,19 +471,28 @@ export default function CircleDetailPage() {
     setFeedbackMsg("");
     try {
       setFeedbackMsg("Leaving circle and refunding join stake...");
+      let leaveHash;
       try {
-        await writeContractAsync({
+        leaveHash = await writeContractAsync({
           address: circleAddress,
           abi: GROUP_SAVE_ABI,
           functionName: "leave",
         });
       } catch (e) {
-        await writeContractAsync({
+        leaveHash = await writeContractAsync({
           address: circleAddress,
           abi: GROUP_SAVE_ABI,
           functionName: "leaveCircle",
         });
       }
+      if (publicClient && leaveHash) {
+        await publicClient.waitForTransactionReceipt({ hash: leaveHash });
+      }
+      setFeedbackMsg("Successfully left the circle. Your join stake has been refunded.");
+      refetchInfo();
+      refetchMembers();
+      refetchMemberInfo();
+      refetchBalance();
     } catch (err) {
       setFeedbackMsg("");
       setErrorMsg(parseContractError(err));
@@ -365,37 +515,153 @@ export default function CircleDetailPage() {
         return;
       }
 
-      setFeedbackMsg(`Inviting ${addrs.length} wallet(s)...`);
-      await writeContractAsync({
+      setFeedbackMsg(`Inviting ${addrs.length} wallet(s) in your wallet...`);
+      const invHash = await writeContractAsync({
         address: circleAddress,
         abi: GROUP_SAVE_ABI,
         functionName: "invite",
         args: [addrs],
       });
+      setFeedbackMsg("Waiting for invitations to confirm on Sepolia...");
+      if (publicClient) {
+        await publicClient.waitForTransactionReceipt({ hash: invHash });
+      }
+      setFeedbackMsg(`Successfully invited ${addrs.length} wallet(s)!`);
+      setInvitedAddresses((prev) => {
+        const next = Array.from(new Set([...prev, ...addrs]));
+        try {
+          localStorage.setItem(
+            `cowrie_invited_${circleAddress.toLowerCase()}`,
+            JSON.stringify(next)
+          );
+        } catch {}
+        return next;
+      });
       setShowInviteModal(false);
       setInviteAddresses("");
+      refetchInfo();
+      refetchMembers();
+      refetchMemberInfo();
     } catch (err) {
       setFeedbackMsg("");
       setErrorMsg(parseContractError(err));
     }
   };
 
-  // 7. Cancel Open Pool
-  const handleCancelOpen = async () => {
+  // 7. Uninvite Peer (Creator only, before member has joined)
+  const handleUninvite = async (targetUser) => {
     setErrorMsg("");
     setFeedbackMsg("");
     try {
-      setFeedbackMsg("Cancelling circle and releasing all stakes...");
-      await writeContractAsync({
+      setFeedbackMsg(`Revoking invitation for ${targetUser.slice(0, 8)}... in your wallet...`);
+      const uninviteHash = await writeContractAsync({
         address: circleAddress,
         abi: GROUP_SAVE_ABI,
-        functionName: "cancelOpen",
+        functionName: "uninvite",
+        args: [targetUser],
       });
+      setFeedbackMsg("Waiting for uninvite confirmation on Sepolia...");
+      if (publicClient) {
+        await publicClient.waitForTransactionReceipt({ hash: uninviteHash });
+      }
+      setFeedbackMsg("Invitation revoked! The slot is now freed up for another wallet.");
+      setInvitedAddresses((prev) => {
+        const next = prev.filter((a) => a.toLowerCase() !== targetUser.toLowerCase());
+        try {
+          localStorage.setItem(
+            `cowrie_invited_${circleAddress.toLowerCase()}`,
+            JSON.stringify(next)
+          );
+        } catch {}
+        return next;
+      });
+      refetchInfo();
+      refetchMembers();
+      refetchMemberInfo();
     } catch (err) {
       setFeedbackMsg("");
       setErrorMsg(parseContractError(err));
     }
   };
+
+  // 8. Cancel Open Pool
+  const handleCancelOpen = async () => {
+    setErrorMsg("");
+    setFeedbackMsg("");
+    try {
+      setFeedbackMsg("Cancelling circle and releasing all stakes...");
+      const cancelHash = await writeContractAsync({
+        address: circleAddress,
+        abi: GROUP_SAVE_ABI,
+        functionName: "cancelOpen",
+      });
+      if (publicClient) {
+        await publicClient.waitForTransactionReceipt({ hash: cancelHash });
+      }
+      setFeedbackMsg("Circle cancelled. All join stakes are now claimable.");
+      refetchInfo();
+      refetchMembers();
+      refetchMemberInfo();
+    } catch (err) {
+      setFeedbackMsg("");
+      setErrorMsg(parseContractError(err));
+    }
+  };
+
+  // Unified roster of confirmed members and pending invited peers
+  const roster = useMemo(() => {
+    const list = [];
+    const joinedSet = new Set((members || []).map((m) => m.toLowerCase()));
+
+    // 1. Confirmed members who have joined & staked
+    (members || []).forEach((addr, idx) => {
+      const payoutTurn =
+        payoutOrder && payoutOrder.length > 0
+          ? payoutOrder.findIndex((p) => p.toLowerCase() === addr.toLowerCase()) + 1
+          : null;
+      list.push({
+        address: addr,
+        isMember: true,
+        payoutTurn,
+        slotIndex: idx + 1,
+      });
+    });
+
+    // 2. Creator (if not yet joined)
+    if (circleCreator && !joinedSet.has(circleCreator.toLowerCase())) {
+      list.push({
+        address: circleCreator,
+        isMember: false,
+        isCreator: true,
+        slotIndex: list.length + 1,
+      });
+      joinedSet.add(circleCreator.toLowerCase());
+    }
+
+    // 3. User themselves (if invited and not yet joined)
+    if (userAddress && isInvited && !joinedSet.has(userAddress.toLowerCase())) {
+      list.push({
+        address: userAddress,
+        isMember: false,
+        slotIndex: list.length + 1,
+      });
+      joinedSet.add(userAddress.toLowerCase());
+    }
+
+    // 4. Other invited peers who haven't joined yet
+    invitedAddresses.forEach((addr) => {
+      if (addr && !joinedSet.has(addr.toLowerCase())) {
+        list.push({
+          address: addr,
+          isMember: false,
+          slotIndex: list.length + 1,
+        });
+        joinedSet.add(addr.toLowerCase());
+      }
+    });
+
+    return list;
+  }, [members, payoutOrder, circleCreator, userAddress, isInvited, invitedAddresses]);
 
   return (
     <div className="min-h-screen bg-[#0E2927] text-[#F6F1E7]">
@@ -444,8 +710,79 @@ export default function CircleDetailPage() {
         {errorMsg && (
           <div className="p-3.5 rounded-xl bg-[rgba(235,87,87,0.12)] border border-[rgba(235,87,87,0.3)] text-[#EB5757] text-xs sm:text-sm flex items-start gap-2">
             <span className="material-symbols-outlined text-[18px] shrink-0">error</span>
-            <span>{errorMsg}</span>
+            <div className="flex-1">
+              <span>{errorMsg}</span>
+              {errorMsg.toLowerCase().includes("faucet") && (
+                <div className="mt-2">
+                  <Link
+                    href="/faucet"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#2BB59A] hover:bg-[#259e87] text-[#0E2927] rounded-lg text-xs font-bold transition-colors shadow-sm"
+                  >
+                    <span className="material-symbols-outlined text-[15px]">water_drop</span>
+                    Go to Faucet to claim 1,000 mUSDC
+                  </Link>
+                </div>
+              )}
+            </div>
           </div>
+        )}
+
+        {/* Invitee Action Required Hero Banner */}
+        {status === 0 && isInvited && !isMember && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-5 sm:p-6 rounded-2xl bg-gradient-to-r from-amber-500/20 via-emerald-500/15 to-[#143734] border-2 border-amber-400/50 text-[#F6F1E7] shadow-[0_4px_24px_rgba(245,158,11,0.18)]"
+          >
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-amber-400/20 text-amber-300 border border-amber-400/40 flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-[28px]">mark_email_unread</span>
+                </div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-full bg-amber-400 text-black text-[11px] font-extrabold uppercase tracking-wider">
+                      Action Required
+                    </span>
+                    <h2 className="sora text-lg sm:text-xl font-bold text-[#F6F1E7]">
+                      {isCreator
+                        ? "You are the Circle Creator — Complete Your Stake to Join"
+                        : "You Have Been Invited to Join This Ajo Circle!"}
+                    </h2>
+                  </div>
+                  <p className="text-xs sm:text-sm text-[#9DB5AF] mt-1.5 max-w-2xl leading-relaxed">
+                    {isCreator
+                      ? `As the creator, deposit your join stake of ${fmtUSDC(contribution)} mUSDC to secure your slot. The circle will start automatically once all ${memberCount} members have joined.`
+                      : `The circle creator whitelisted your wallet address. To accept and secure your slot, deposit your refundable join stake of ${fmtUSDC(contribution)} mUSDC. Regular round contributions will only begin after all ${memberCount} members have joined and the circle becomes Active.`}
+                  </p>
+                  {userBalance !== undefined && userBalance < contribution && (
+                    <div className="mt-2.5 p-2.5 rounded-xl bg-amber-400/10 border border-amber-400/30 text-xs text-amber-300 flex flex-wrap items-center gap-2">
+                      <span className="material-symbols-outlined text-[16px] text-amber-400">warning</span>
+                      <span>
+                        Your balance: <strong>{fmtUSDC(userBalance)} mUSDC</strong> (Insufficient for join stake).
+                      </span>
+                      <Link
+                        href="/faucet"
+                        className="underline font-bold text-[#2BB59A] hover:text-white"
+                      >
+                        Claim 1,000 free test mUSDC from Faucet →
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                <button
+                  onClick={handleJoin}
+                  disabled={isBusy}
+                  className="w-full md:w-auto px-6 py-3.5 bg-[#2BB59A] hover:bg-[#259e87] disabled:opacity-50 text-[#0E2927] rounded-xl text-sm font-bold tracking-wide transition-all shadow-[0_4px_16px_rgba(43,181,154,0.35)] cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-[20px]">how_to_reg</span>
+                  {isBusy ? "Processing..." : `Accept & Stake (${fmtUSDC(contribution)} mUSDC)`}
+                </button>
+              </div>
+            </div>
+          </motion.div>
         )}
 
         {/* Bento Row 1: Pot Info & Position */}
@@ -655,79 +992,127 @@ export default function CircleDetailPage() {
           </motion.div>
         </div>
 
-        {/* Members & Payout Order Table */}
+        {/* Members & Whitelist Roster Table */}
         <div className="bg-[#143734] border border-[rgba(246,241,231,0.08)] rounded-2xl overflow-hidden shadow-sm">
           <div className="px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[rgba(246,241,231,0.08)]">
             <div>
               <h2 className="sora text-base font-semibold text-[#F6F1E7]">
-                Circle Members & Turn Order
+                Circle Members & Whitelist Roster
               </h2>
               <p className="text-xs text-[#9DB5AF] mt-0.5">
                 {status === 0
-                  ? "Members whitelisted to join before start."
-                  : "On-chain randomized payout sequence."}
+                  ? "Track joined members, pending invitations, and allocate open slots before start."
+                  : "On-chain randomized payout sequence and round contribution tracking."}
               </p>
             </div>
-            <span className="text-xs text-[#2BB59A] font-semibold">
-              {members?.length || 0} of {memberCount} joined
-            </span>
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-[#2BB59A] font-semibold">
+                {members?.length || 0} / {memberCount} joined
+              </span>
+              {status === 0 && (
+                <span className="text-[#9DB5AF]">
+                  ({roster.filter((r) => !r.isMember).length} pending invite)
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs sm:text-sm">
               <thead>
                 <tr className="text-[11px] font-semibold tracking-wider uppercase text-[#9DB5AF] border-b border-[rgba(246,241,231,0.06)] bg-black/10">
-                  <th className="px-6 py-3.5">Turn #</th>
-                  <th className="px-6 py-3.5">Member Address</th>
-                  <th className="px-6 py-3.5">Round Status</th>
+                  <th className="px-6 py-3.5">Slot / Turn</th>
+                  <th className="px-6 py-3.5">Wallet Address</th>
+                  <th className="px-6 py-3.5">Status</th>
+                  <th className="px-6 py-3.5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[rgba(246,241,231,0.04)]">
-                {!members || members.length === 0 ? (
+                {roster.length === 0 ? (
                   <tr>
-                    <td colSpan={3} className="px-6 py-8 text-center text-[#9DB5AF]">
-                      No members joined yet.
+                    <td colSpan={4} className="px-6 py-8 text-center text-[#9DB5AF]">
+                      No members joined or invited yet.
                     </td>
                   </tr>
                 ) : (
-                  members.map((addr, idx) => {
+                  roster.map((item) => {
                     const isMe =
-                      userAddress && addr.toLowerCase() === userAddress.toLowerCase();
-                    const payoutTurn =
-                      payoutOrder && payoutOrder.length > 0
-                        ? payoutOrder.findIndex(
-                            (p) => p.toLowerCase() === addr.toLowerCase()
-                          ) + 1
-                        : null;
+                      userAddress && item.address.toLowerCase() === userAddress.toLowerCase();
+                    const isCreatorAddress =
+                      circleCreator && item.address.toLowerCase() === circleCreator.toLowerCase();
 
                     return (
                       <tr
-                        key={addr}
-                        className="hover:bg-white/[0.02] transition-colors"
+                        key={item.address}
+                        className={`hover:bg-white/[0.02] transition-colors ${
+                          isMe ? "bg-[#2BB59A]/[0.04]" : ""
+                        }`}
                       >
                         <td className="px-6 py-3.5 text-[#9DB5AF] font-semibold tabular-nums">
-                          {payoutTurn ? `Turn ${payoutTurn}` : `Slot ${idx + 1}`}
+                          {item.payoutTurn
+                            ? `Turn ${item.payoutTurn}`
+                            : item.isMember
+                            ? `Slot ${item.slotIndex}`
+                            : "Pending Slot"}
                         </td>
                         <td className="px-6 py-3.5 font-mono">
                           <span className="text-[#F6F1E7]">
-                            {addr.slice(0, 10)}...{addr.slice(-8)}
+                            {item.address.slice(0, 10)}...{item.address.slice(-8)}
                           </span>
                           {isMe && (
                             <span className="ml-2.5 px-2 py-0.5 rounded-full bg-[rgba(43,181,154,0.18)] text-[#2BB59A] text-[10px] font-bold uppercase tracking-wider">
                               You
                             </span>
                           )}
-                          {circleCreator &&
-                            addr.toLowerCase() === circleCreator.toLowerCase() && (
-                              <span className="ml-2 px-2 py-0.5 rounded-full bg-[rgba(227,176,75,0.15)] text-[#E3B04B] text-[10px] font-semibold uppercase tracking-wider">
-                                Creator
-                              </span>
-                            )}
+                          {isCreatorAddress && (
+                            <span className="ml-2 px-2 py-0.5 rounded-full bg-[rgba(227,176,75,0.15)] text-[#E3B04B] text-[10px] font-semibold uppercase tracking-wider">
+                              Creator
+                            </span>
+                          )}
                         </td>
                         <td className="px-6 py-3.5">
-                          <span className="px-2.5 py-1 rounded-full bg-[rgba(43,181,154,0.12)] text-[#2BB59A] text-xs font-semibold">
-                            Joined & Staked
-                          </span>
+                          {item.isMember ? (
+                            <span className="px-2.5 py-1 rounded-full bg-[rgba(43,181,154,0.15)] text-[#2BB59A] text-xs font-semibold flex items-center gap-1.5 w-fit">
+                              <span className="w-1.5 h-1.5 rounded-full bg-[#2BB59A]" />
+                              Joined & Staked
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 text-xs font-semibold flex items-center gap-1.5 w-fit">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                              Invite Pending
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-3.5 text-right">
+                          {status === 0 && !item.isMember && (
+                            <div className="flex items-center justify-end gap-2">
+                              {isMe && (
+                                <button
+                                  onClick={handleJoin}
+                                  disabled={isBusy}
+                                  className="px-3 py-1 bg-[#2BB59A] hover:bg-[#259e87] text-[#0E2927] rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                                >
+                                  Join Now
+                                </button>
+                              )}
+                              {isCreator && (
+                                <button
+                                  onClick={() => handleUninvite(item.address)}
+                                  disabled={isBusy}
+                                  title="Revoke this invitation and free up the slot for another wallet"
+                                  className="px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/25 rounded-lg text-xs font-medium transition-colors cursor-pointer flex items-center gap-1"
+                                >
+                                  <span className="material-symbols-outlined text-[14px]">person_remove</span>
+                                  Uninvite
+                                </button>
+                              )}
+                            </div>
+                          )}
+                          {item.isMember && (
+                            <span className="text-[11px] text-[#9DB5AF] font-mono">
+                              Slot Secured
+                            </span>
+                          )}
                         </td>
                       </tr>
                     );
@@ -765,7 +1150,7 @@ export default function CircleDetailPage() {
                   </button>
                 </div>
                 <p className="text-xs sm:text-sm text-[#9DB5AF] mt-2.5 leading-relaxed">
-                  Enter Ethereum wallet addresses to whitelist. Each address will be able to view and join this circle.
+                  Enter Ethereum wallet addresses to whitelist. Each address will be able to view this circle under "My Circles", see their invitation, and deposit their join stake.
                 </p>
 
                 <form onSubmit={handleInviteSubmit} className="mt-4 space-y-4">
