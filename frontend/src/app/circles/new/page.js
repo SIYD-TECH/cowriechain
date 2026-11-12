@@ -212,6 +212,11 @@ export default function NewCirclePage() {
                   required
                   disabled={isPending || isConfirming}
                 />
+                {f.contrib && Number(f.contrib) > 0 ? (
+                  <span className="text-[11px] text-[#E3B04B] font-mono mt-1 block">
+                    ≈ ₦{Math.round(Number(f.contrib) * 1600).toLocaleString()} NGN (at ~₦1,600 / $1 mUSDC)
+                  </span>
+                ) : null}
               </div>
 
               <div>
@@ -277,16 +282,23 @@ export default function NewCirclePage() {
             <div className="p-4 rounded-xl bg-[#0E2927] border border-[rgba(246,241,231,0.06)] text-xs text-[#9DB5AF] space-y-1.5">
               <div className="flex justify-between items-center">
                 <span>Total Pot Per Round:</span>
-                <span className="text-base font-bold text-[#2BB59A]">
-                  {potPerRound} mUSDC
-                </span>
+                <div className="text-right">
+                  <span className="text-base font-bold text-[#2BB59A]">
+                    {potPerRound} mUSDC
+                  </span>
+                  {f.contrib && f.members ? (
+                    <span className="text-xs text-[#E3B04B] font-mono ml-2">
+                      ≈ ₦{Math.round(Number(f.contrib || 0) * Number(f.members || 0) * 1600).toLocaleString()}
+                    </span>
+                  ) : null}
+                </div>
               </div>
               <div className="text-[11px] text-[#9DB5AF]/80 leading-relaxed pt-1 border-t border-[rgba(246,241,231,0.06)]">
                 • <strong>Rounds = Members:</strong> {f.members} rounds total so every member receives the pot exactly once.
                 <br />
                 • <strong>Collateral Model:</strong> {f.collateralPct}% held back from early recipients and released gradually as they continue paying subsequent rounds.
                 <br />
-                • <strong>Stake:</strong> 1x contribution ({f.contrib} mUSDC) staked upon joining, fully refunded at circle completion.
+                • <strong>Stake:</strong> 1x contribution ({f.contrib} mUSDC • ~₦{Math.round(Number(f.contrib || 0) * 1600).toLocaleString()}) staked upon joining, fully refunded at circle completion.
               </div>
             </div>
 

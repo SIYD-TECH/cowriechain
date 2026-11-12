@@ -17,6 +17,7 @@ import {
   GROUP_SAVE_ABI,
   ADDRESSES,
   fmtUSDC,
+  fmtNGN,
   parseContractError,
 } from "@/lib/contracts";
 
@@ -289,6 +290,7 @@ export default function CircleDetailPage() {
   const paidThisRound = circleInfo?.paidThisRound ? Number(circleInfo.paidThisRound) : 0;
   const currentRoundDeadline = circleInfo?.currentRoundDeadline ? Number(circleInfo.currentRoundDeadline) : 0;
   const collateralBps = circleInfo?.collateralBps ? Number(circleInfo.collateralBps) : 10000;
+  const graceDuration = circleInfo?.graceDuration ? Number(circleInfo.graceDuration) : 0;
 
   const totalPot = contribution * BigInt(memberCount);
   const progressPct = memberCount > 0 ? Math.round((paidThisRound / memberCount) * 100) : 0;
@@ -752,14 +754,14 @@ export default function CircleDetailPage() {
                   </div>
                   <p className="text-xs sm:text-sm text-[#9DB5AF] mt-1.5 max-w-2xl leading-relaxed">
                     {isCreator
-                      ? `As the creator, deposit your join stake of ${fmtUSDC(contribution)} mUSDC to secure your slot. The circle will start automatically once all ${memberCount} members have joined.`
-                      : `The circle creator whitelisted your wallet address. To accept and secure your slot, deposit your refundable join stake of ${fmtUSDC(contribution)} mUSDC. Regular round contributions will only begin after all ${memberCount} members have joined and the circle becomes Active.`}
+                      ? `As the creator, deposit your join stake of ${fmtUSDC(contribution)} mUSDC (~${fmtNGN(contribution)}) to secure your slot. The circle will start automatically once all ${memberCount} members have joined.`
+                      : `The circle creator whitelisted your wallet address. To accept and secure your slot, deposit your refundable join stake of ${fmtUSDC(contribution)} mUSDC (~${fmtNGN(contribution)}). Regular round contributions will only begin after all ${memberCount} members have joined and the circle becomes Active.`}
                   </p>
                   {userBalance !== undefined && userBalance < contribution && (
                     <div className="mt-2.5 p-2.5 rounded-xl bg-amber-400/10 border border-amber-400/30 text-xs text-amber-300 flex flex-wrap items-center gap-2">
                       <span className="material-symbols-outlined text-[16px] text-amber-400">warning</span>
                       <span>
-                        Your balance: <strong>{fmtUSDC(userBalance)} mUSDC</strong> (Insufficient for join stake).
+                        Your balance: <strong>{fmtUSDC(userBalance)} mUSDC (~{fmtNGN(userBalance)})</strong> (Insufficient for join stake).
                       </span>
                       <Link
                         href="/faucet"
@@ -778,7 +780,7 @@ export default function CircleDetailPage() {
                   className="w-full md:w-auto px-6 py-3.5 bg-[#2BB59A] hover:bg-[#259e87] disabled:opacity-50 text-[#0E2927] rounded-xl text-sm font-bold tracking-wide transition-all shadow-[0_4px_16px_rgba(43,181,154,0.35)] cursor-pointer flex items-center justify-center gap-2"
                 >
                   <span className="material-symbols-outlined text-[20px]">how_to_reg</span>
-                  {isBusy ? "Processing..." : `Accept & Stake (${fmtUSDC(contribution)} mUSDC)`}
+                  {isBusy ? "Processing..." : `Accept & Stake (${fmtUSDC(contribution)} mUSDC • ~${fmtNGN(contribution)})`}
                 </button>
               </div>
             </div>
@@ -799,12 +801,15 @@ export default function CircleDetailPage() {
                   <div className="text-[11px] font-semibold tracking-wider uppercase text-[#9DB5AF]">
                     Pot Per Round
                   </div>
-                  <div className="sora text-3xl sm:text-4xl font-bold mt-1 text-[#F6F1E7]">
-                    {fmtUSDC(totalPot, "")}
-                    <span className="text-sm font-normal text-[#2BB59A] ml-2">mUSDC</span>
+                  <div className="sora text-3xl sm:text-4xl font-bold mt-1 text-[#F6F1E7] flex flex-wrap items-baseline gap-2">
+                    <span>{fmtUSDC(totalPot, "")}</span>
+                    <span className="text-sm font-normal text-[#2BB59A]">mUSDC</span>
+                    <span className="text-xs sm:text-sm font-medium text-[#E3B04B] font-mono">
+                      ≈ {fmtNGN(totalPot)}
+                    </span>
                   </div>
                   <div className="text-xs text-[#9DB5AF] mt-1.5 flex flex-wrap items-center gap-2">
-                    <span>Contribution: <strong className="text-[#F6F1E7]">{fmtUSDC(contribution, "")} mUSDC</strong></span>
+                    <span>Contribution: <strong className="text-[#F6F1E7]">{fmtUSDC(contribution, "")} mUSDC</strong> <span className="text-[#E3B04B] font-mono">(~{fmtNGN(contribution)})</span></span>
                     <span>•</span>
                     <span>Hold-back: <strong className="text-[#F6F1E7]">{collateralBps / 100}%</strong></span>
                     <span>•</span>
@@ -865,7 +870,9 @@ export default function CircleDetailPage() {
                   </span>
                   {status === 1 && currentRoundDeadline > 0 && (
                     <span className="ml-2 text-[11px] text-[#E3B04B]">
-                      (Deadline: {roundDeadlineDate})
+                      (Deadline: {roundDeadlineDate}
+                      {graceDuration > 0 && ` • Grace: ${graceDuration >= 86400 ? graceDuration / 86400 + "d" : graceDuration / 60 + "m"}`}
+                      )
                     </span>
                   )}
                 </div>
@@ -881,7 +888,7 @@ export default function CircleDetailPage() {
                   disabled={isBusy}
                   className="px-5 py-2.5 bg-[#2BB59A] hover:bg-[#259e87] text-[#0E2927] rounded-xl text-xs sm:text-sm font-semibold transition-colors cursor-pointer disabled:opacity-50 shadow-[0_2px_10px_rgba(43,181,154,0.3)]"
                 >
-                  {isBusy ? "Processing..." : `Join Circle (Stake: ${fmtUSDC(contribution, "")} mUSDC)`}
+                  {isBusy ? "Processing..." : `Join Circle (${fmtUSDC(contribution, "")} mUSDC • ~${fmtNGN(contribution)})`}
                 </button>
               )}
 
@@ -891,7 +898,7 @@ export default function CircleDetailPage() {
                   disabled={isBusy}
                   className="px-4 py-2 bg-[rgba(235,87,87,0.15)] hover:bg-[rgba(235,87,87,0.25)] text-[#EB5757] border border-[rgba(235,87,87,0.3)] rounded-xl text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
                 >
-                  {isBusy ? "Processing..." : "Leave Circle (Refund Stake)"}
+                  {isBusy ? "Processing..." : `Leave Circle (Refund Stake ~${fmtNGN(contribution)})`}
                 </button>
               )}
 
@@ -920,7 +927,7 @@ export default function CircleDetailPage() {
                   disabled={isBusy}
                   className="px-5 py-2.5 bg-[#2BB59A] hover:bg-[#259e87] text-[#0E2927] rounded-xl text-xs sm:text-sm font-semibold transition-colors cursor-pointer disabled:opacity-50 shadow-[0_2px_10px_rgba(43,181,154,0.3)]"
                 >
-                  {isBusy ? "Processing..." : `Pay Due: ${fmtUSDC(amountDue || contribution, "")} mUSDC`}
+                  {isBusy ? "Processing..." : `Pay Due: ${fmtUSDC(amountDue || contribution, "")} mUSDC (~${fmtNGN(amountDue || contribution)})`}
                 </button>
               )}
 
@@ -951,21 +958,36 @@ export default function CircleDetailPage() {
               <div className="mt-4 space-y-2.5 text-xs">
                 <div className="flex justify-between items-center p-3 rounded-xl bg-[#0E2927] border border-[rgba(246,241,231,0.06)]">
                   <span className="text-[#9DB5AF]">Claimable Payout</span>
-                  <span className="sora font-bold text-[#2BB59A] text-sm">
-                    {fmtUSDC(userClaimable, "")} mUSDC
-                  </span>
+                  <div className="text-right">
+                    <span className="sora font-bold text-[#2BB59A] text-sm">
+                      {fmtUSDC(userClaimable, "")} mUSDC
+                    </span>
+                    <div className="text-[10px] text-[#E3B04B] font-mono">
+                      ≈ {fmtNGN(userClaimable)}
+                    </div>
+                  </div>
                 </div>
                 <div className="flex justify-between items-center p-3 rounded-xl bg-[#0E2927] border border-[rgba(246,241,231,0.06)]">
                   <span className="text-[#9DB5AF]">Collateral Hold-back</span>
-                  <span className="sora font-semibold text-[#F6F1E7]">
-                    {fmtUSDC(userHoldBack, "")} mUSDC
-                  </span>
+                  <div className="text-right">
+                    <span className="sora font-semibold text-[#F6F1E7]">
+                      {fmtUSDC(userHoldBack, "")} mUSDC
+                    </span>
+                    <div className="text-[10px] text-[#9DB5AF] font-mono">
+                      ≈ {fmtNGN(userHoldBack)}
+                    </div>
+                  </div>
                 </div>
                 <div className="flex justify-between items-center p-3 rounded-xl bg-[#0E2927] border border-[rgba(246,241,231,0.06)]">
                   <span className="text-[#9DB5AF]">Staked Join Collateral</span>
-                  <span className="sora font-semibold text-[#F6F1E7]">
-                    {fmtUSDC(userStake, "")} mUSDC
-                  </span>
+                  <div className="text-right">
+                    <span className="sora font-semibold text-[#F6F1E7]">
+                      {fmtUSDC(userStake, "")} mUSDC
+                    </span>
+                    <div className="text-[10px] text-[#9DB5AF] font-mono">
+                      ≈ {fmtNGN(userStake)}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -976,7 +998,7 @@ export default function CircleDetailPage() {
                 disabled={userClaimable === 0n || isBusy}
                 className="flex-1 py-3 bg-[#E3B04B] hover:bg-[#d4a03e] disabled:opacity-30 disabled:cursor-not-allowed text-[#0E2927] rounded-xl text-xs sm:text-sm font-semibold tracking-wider uppercase transition-colors cursor-pointer"
               >
-                Claim Payout ({fmtUSDC(userClaimable, "")} mUSDC)
+                Claim Payout ({fmtUSDC(userClaimable, "")} mUSDC • ~{fmtNGN(userClaimable)})
               </button>
 
               {canResolve && (

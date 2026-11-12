@@ -253,6 +253,50 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* Dashboard Footer with Network & Verified Main CA Links */}
+        <footer className="pt-8 pb-4 mt-8 border-t border-[rgba(246,241,231,0.06)] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#9DB5AF]">
+          <div className="flex items-center gap-2">
+            <span>© 2026 CowrieChain</span>
+            <span>•</span>
+            <span className="text-[#2BB59A] flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#2BB59A] inline-block animate-pulse" />
+              Live on Testnet
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            <a
+              href="https://sepolia.etherscan.io"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#143734] hover:bg-[#1c4b47] border border-[rgba(246,241,231,0.08)] hover:border-[#2BB59A]/40 text-[#F6F1E7] transition-all group"
+              title="Ethereum Sepolia Testnet Explorer"
+            >
+              <span className="w-2 h-2 rounded-full bg-[#E3B04B]" />
+              <span className="text-[11px] text-[#9DB5AF]">Network:</span>
+              <strong className="text-[11px] text-[#E3B04B] font-semibold group-hover:underline flex items-center gap-0.5">
+                Ethereum Sepolia
+                <span className="material-symbols-outlined text-[13px]">open_in_new</span>
+              </strong>
+            </a>
+
+            <a
+              href={`https://sepolia.etherscan.io/address/${ADDRESSES.groupSaveFactory}#code`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#143734] hover:bg-[#1c4b47] border border-[rgba(246,241,231,0.08)] hover:border-[#2BB59A]/40 text-[#F6F1E7] transition-all group"
+              title="Verify CowrieChain Factory Contract on Sepolia Etherscan"
+            >
+              <span className="material-symbols-outlined text-[14px] text-[#2BB59A]">verified</span>
+              <span className="text-[11px] text-[#9DB5AF]">Main CA:</span>
+              <span className="text-[11px] font-mono text-[#2BB59A] font-semibold group-hover:underline flex items-center gap-0.5">
+                {ADDRESSES.groupSaveFactory.slice(0, 6)}...{ADDRESSES.groupSaveFactory.slice(-4)}
+                <span className="material-symbols-outlined text-[13px]">open_in_new</span>
+              </span>
+            </a>
+          </div>
+        </footer>
       </main>
     </div>
   );

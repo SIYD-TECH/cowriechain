@@ -1,4 +1,8 @@
+import { ADDRESSES } from "@/lib/contracts";
+
 export default function Footer() {
+  const mainCA = ADDRESSES.groupSaveFactory;
+
   return (
     <footer className="bg-[#01110c] border-t border-white/[0.06]">
       <div className="max-w-[1440px] mx-auto px-4 lg:px-8 pt-10 pb-6">
@@ -51,12 +55,51 @@ export default function Footer() {
             before depositing.
           </span>
         </div>
-        <div className="mt-6 flex flex-col md:flex-row items-center justify-between gap-3 text-[11px] text-[#bccabf]">
-          <span>© 2025 CowrieChain Labs</span>
-          <span className="flex gap-4">
-            <span>All systems operational</span>
-            <span className="mono">Block 19,402,184</span>
-          </span>
+
+        {/* Network & Verified Contract Badges */}
+        <div className="mt-6 pt-6 border-t border-white/[0.06] flex flex-col md:flex-row items-center justify-between gap-4 text-[12px] text-[#bccabf]">
+          <div className="flex flex-wrap items-center gap-3">
+            <span>© 2026 CowrieChain Labs</span>
+            <span>•</span>
+            <span className="flex items-center gap-1.5 text-[#2BB59A]">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#2BB59A] animate-pulse" />
+              All systems operational
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Ethereum Sepolia Testnet Link */}
+            <a
+              href="https://sepolia.etherscan.io"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#10231d] hover:bg-[#1a382e] border border-white/[0.08] hover:border-[#2BB59A]/40 text-[#F6F1E7] transition-all group"
+              title="View Ethereum Sepolia Testnet Network Explorer"
+            >
+              <span className="w-2 h-2 rounded-full bg-[#E3B04B]" />
+              <span className="text-[11px] text-[#bccabf]">Network:</span>
+              <span className="text-[11px] font-semibold text-[#E3B04B] group-hover:underline flex items-center gap-0.5">
+                Ethereum Sepolia
+                <span className="material-symbols-outlined text-[13px]">open_in_new</span>
+              </span>
+            </a>
+
+            {/* Main Contract Address (CA) Link */}
+            <a
+              href={`https://sepolia.etherscan.io/address/${mainCA}#code`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#10231d] hover:bg-[#1a382e] border border-white/[0.08] hover:border-[#2BB59A]/40 text-[#F6F1E7] transition-all group"
+              title="Verify CowrieChain Factory Contract on Sepolia Etherscan"
+            >
+              <span className="material-symbols-outlined text-[14px] text-[#2BB59A]">verified</span>
+              <span className="text-[11px] text-[#bccabf]">Main CA:</span>
+              <span className="text-[11px] font-mono text-[#2BB59A] font-semibold group-hover:underline flex items-center gap-0.5">
+                {mainCA.slice(0, 6)}...{mainCA.slice(-4)}
+                <span className="material-symbols-outlined text-[13px]">open_in_new</span>
+              </span>
+            </a>
+          </div>
         </div>
       </div>
     </footer>

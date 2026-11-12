@@ -12,6 +12,7 @@ import {
   GROUP_SAVE_FACTORY_ABI,
   GROUP_SAVE_ABI,
   fmtUSDC,
+  fmtNGN,
 } from "@/lib/contracts";
 
 const STATUS_NAMES = ["Open", "Active", "Completed", "Cancelled"];
@@ -126,11 +127,16 @@ function CircleCard({ address }) {
         </div>
 
         <div className="mt-4 pt-3 border-t border-[rgba(246,241,231,0.06)] space-y-1.5 text-xs">
-          <div className="flex justify-between">
+          <div className="flex justify-between items-baseline">
             <span className="text-[#9DB5AF]">Contribution:</span>
-            <span className="font-semibold text-[#F6F1E7]">
-              {fmtUSDC(contribution, "")} mUSDC
-            </span>
+            <div className="text-right">
+              <span className="font-semibold text-[#F6F1E7]">
+                {fmtUSDC(contribution, "")} mUSDC
+              </span>
+              <span className="text-[11px] text-[#E3B04B] font-mono ml-1.5">
+                (~{fmtNGN(contribution)})
+              </span>
+            </div>
           </div>
           <div className="flex justify-between">
             <span className="text-[#9DB5AF]">Members:</span>

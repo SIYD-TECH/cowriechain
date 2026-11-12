@@ -66,6 +66,29 @@ export function fmtUSDC(raw, currency = "") {
   return currency ? `${currency}${formatted}` : formatted;
 }
 
+// Reference conversion rate for Nigerian users (1 mUSDC/USD = ~₦1,600 NGN)
+export const USD_TO_NGN_RATE = Number(process.env.NEXT_PUBLIC_USD_TO_NGN_RATE || 1600);
+
+// Helper: format 6-decimal mUSDC BigInt or numeric amount to equivalent Nigerian Naira (₦)
+export function fmtNGN(raw, isRaw = true) {
+  if (raw === undefined || raw === null) return "₦0";
+  const usdc = isRaw ? Number(raw) / 1e6 : Number(raw);
+  const ngn = usdc * USD_TO_NGN_RATE;
+  return "₦" + Math.round(ngn).toLocaleString("en-US");
+}
+
+// Helper: format both mUSDC and equivalent NGN (e.g. "50.00 mUSDC (~₦80,000)")
+export function fmtUSDandNGN(raw, isRaw = true) {
+  const usdcStr = isRaw
+    ? fmtUSDC(raw, "")
+    : Number(raw || 0).toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+  const ngnStr = fmtNGN(raw, isRaw);
+  return `${usdcStr} mUSDC (~${ngnStr})`;
+}
+
 // Convert user decimal input (e.g. "500.50") to 6-decimal base units BigInt
 export function parseUSDC(input) {
   if (!input) return 0n;
