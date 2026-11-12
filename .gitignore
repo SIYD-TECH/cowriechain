@@ -39,7 +39,6 @@ dist/
 # Specific Workspace Secrets
 contract/.env
 frontend/.env.local
-backend/.env
 
 # Foundry & Smart Contract Artifacts
 cache/
